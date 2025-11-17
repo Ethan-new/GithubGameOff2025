@@ -106,10 +106,12 @@ public class PlayerController : MonoBehaviour
                 {
                     Debug.LogWarning("Interact action not found in input actions!");
                 }
+                #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 else
                 {
                     Debug.Log("Interact action found successfully");
                 }
+                #endif
             }
             else
             {
@@ -175,7 +177,9 @@ public class PlayerController : MonoBehaviour
         if (weaponHolder != null)
         {
             weaponHolder.gameObject.SetActive(true);
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"Weapon holder created at: {weaponHolder.position}, local: {weaponHolder.localPosition}, parent: {(weaponHolder.parent != null ? weaponHolder.parent.name : "null")}");
+            #endif
         }
 
         // Initialize starting weapons
@@ -533,7 +537,9 @@ public class PlayerController : MonoBehaviour
     {
         if (interactPressed)
         {
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log("Interact pressed - attempting to pick up weapon");
+            #endif
             TryPickupWeapon();
             interactPressed = false; // Reset interact input
         }
@@ -559,6 +565,10 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    // Cache for Physics.OverlapSphere to avoid allocations
+    private Collider[] overlapResults = new Collider[32]; // Pre-allocate array
+    private const int MAX_OVERLAP_RESULTS = 32;
+
     /// <summary>
     /// Attempts to find and pick up a weapon from the ground.
     /// </summary>
@@ -567,26 +577,33 @@ public class PlayerController : MonoBehaviour
         // Get the player's position (use camera position for more accurate detection)
         Vector3 checkPosition = playerCamera != null ? playerCamera.transform.position : transform.position;
 
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"Checking for weapons at position: {checkPosition}, range: {pickupRange}, layer mask: {weaponLayerMask.value}");
+        #endif
 
-        // Use overlap sphere to find nearby weapons - try without layer mask first if nothing found
-        Collider[] colliders = Physics.OverlapSphere(checkPosition, pickupRange, weaponLayerMask);
+        // Use non-allocating overlap sphere to find nearby weapons
+        int hitCount = Physics.OverlapSphereNonAlloc(checkPosition, pickupRange, overlapResults, weaponLayerMask);
 
         // If no colliders found with layer mask, try without layer mask
-        if (colliders.Length == 0)
+        if (hitCount == 0)
         {
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log("No colliders found with layer mask, trying without layer mask");
-            colliders = Physics.OverlapSphere(checkPosition, pickupRange);
+            #endif
+            hitCount = Physics.OverlapSphereNonAlloc(checkPosition, pickupRange, overlapResults);
         }
 
-        Debug.Log($"Found {colliders.Length} colliders in range");
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+        Debug.Log($"Found {hitCount} colliders in range");
+        #endif
 
         GroundWeapon nearestGroundWeapon = null;
         float nearestDistance = float.MaxValue;
 
         // Find the nearest ground weapon
-        foreach (Collider col in colliders)
+        for (int i = 0; i < hitCount; i++)
         {
+            Collider col = overlapResults[i];
             if (col == null) continue;
 
             // Check for GroundWeapon component on this object or parent
@@ -603,7 +620,9 @@ public class PlayerController : MonoBehaviour
                 // Use the larger of pickupRange or the weapon's pickup radius
                 float effectiveRange = Mathf.Max(pickupRange, groundWeapon.PickupRadius);
 
+                #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.Log($"Found GroundWeapon: {groundWeapon.name}, distance: {distance}, effective range: {effectiveRange}");
+                #endif
 
                 if (distance <= effectiveRange && distance < nearestDistance)
                 {
@@ -615,11 +634,15 @@ public class PlayerController : MonoBehaviour
 
         if (nearestGroundWeapon == null)
         {
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.LogWarning("No ground weapon found in range");
+            #endif
             return;
         }
 
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"Found nearest weapon: {nearestGroundWeapon.name}");
+        #endif
 
         Weapon weaponToPickup = nearestGroundWeapon.Weapon;
         if (weaponToPickup == null)
@@ -633,7 +656,9 @@ public class PlayerController : MonoBehaviour
             // Pick up weapon into empty slot
             PickupWeapon(weaponToPickup, emptySlot);
             nearestGroundWeapon.OnPickedUp();
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"Picked up {weaponToPickup.WeaponName}");
+            #endif
         }
         else
         {
@@ -645,7 +670,9 @@ public class PlayerController : MonoBehaviour
                 {
                     SwapWeapon(weaponToPickup, currentWeapon, currentWeaponIndex);
                     nearestGroundWeapon.OnPickedUp();
+                    #if UNITY_EDITOR || DEVELOPMENT_BUILD
                     Debug.Log($"Swapped {currentWeapon.WeaponName} for {weaponToPickup.WeaponName}");
+                    #endif
                 }
             }
             else
@@ -658,7 +685,9 @@ public class PlayerController : MonoBehaviour
                         Weapon weaponToDrop = weaponInventory[i];
                         SwapWeapon(weaponToPickup, weaponToDrop, i);
                         nearestGroundWeapon.OnPickedUp();
+                        #if UNITY_EDITOR || DEVELOPMENT_BUILD
                         Debug.Log($"Swapped {weaponToDrop.WeaponName} for {weaponToPickup.WeaponName}");
+                        #endif
                         break;
                     }
                 }
@@ -837,7 +866,9 @@ public class PlayerController : MonoBehaviour
             // Apply position offset
             newWeapon.OnEquip();
 
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"Equipped {newWeapon.WeaponName} immediately");
+            #endif
         }
     }
 
@@ -955,7 +986,9 @@ public class PlayerController : MonoBehaviour
         if (newWeapon != null)
         {
             newWeapon.OnEquip();
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"Switched to {newWeapon.WeaponName}");
+            #endif
         }
 
         isSwappingWeapon = false;
@@ -1006,7 +1039,9 @@ public class PlayerController : MonoBehaviour
         {
             // This is a prefab, instantiate it
             weaponInstance = Instantiate(weapon);
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"Instantiated weapon prefab: {weaponInstance.WeaponName}");
+            #endif
         }
 
         // Add the new weapon
@@ -1036,7 +1071,9 @@ public class PlayerController : MonoBehaviour
         weaponInstance.transform.localPosition = Vector3.zero;
         weaponInstance.transform.localRotation = Quaternion.identity;
 
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"Added weapon {weaponInstance.WeaponName} to slot {slot}, weapon holder: {weaponHolder != null}, local pos: {weaponInstance.transform.localPosition}");
+        #endif
 
         // If no weapon is currently equipped, equip this one immediately (no animation for first weapon)
         if (currentWeaponIndex < 0)

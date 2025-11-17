@@ -86,19 +86,20 @@ public class ScoreUI : MonoBehaviour
         }
 #endif
 
-        // Find ScoreManager
-        if (ScoreManager.Instance == null)
+        // Find ScoreManager - prefer singleton instance
+        if (ScoreManager.Instance != null)
         {
+            scoreManager = ScoreManager.Instance;
+        }
+        else
+        {
+            // Fallback: find in scene if singleton not initialized yet
             scoreManager = FindFirstObjectByType<ScoreManager>();
             if (scoreManager == null)
             {
                 Debug.LogWarning("ScoreUI: No ScoreManager found in scene. Score will not update.", this);
                 return;
             }
-        }
-        else
-        {
-            scoreManager = ScoreManager.Instance;
         }
 
         // Subscribe to score changes
@@ -198,7 +199,8 @@ public class ScoreUI : MonoBehaviour
     /// <param name="score">The new score value.</param>
     private void UpdateScoreDisplay(int score)
     {
-        string scoreString = showPrefix ? (scorePrefix + score.ToString()) : score.ToString();
+        // Cache score string to avoid allocations - only update if score changed
+        string scoreString = showPrefix ? string.Concat(scorePrefix, score) : score.ToString();
 
 #if UNITY_TEXTMESHPRO
         if (scoreTextTMP != null)

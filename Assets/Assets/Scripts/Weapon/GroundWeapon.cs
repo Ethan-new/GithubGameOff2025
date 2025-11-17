@@ -67,10 +67,12 @@ public class GroundWeapon : MonoBehaviour
         bool inRange = distance <= pickupRadius;
         
         // Debug log to help diagnose issues
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         if (!inRange && weapon != null)
         {
             Debug.Log($"{weapon.WeaponName}: Distance {distance} > pickup radius {pickupRadius}");
         }
+        #endif
         
         return inRange;
     }

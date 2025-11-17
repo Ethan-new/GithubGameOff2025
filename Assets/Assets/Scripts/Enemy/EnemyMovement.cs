@@ -43,12 +43,25 @@ public class EnemyMovement : MonoBehaviour
         }
     }
 
+    private float targetSearchCooldown = 0f;
+    private const float TARGET_SEARCH_INTERVAL = 1f; // Only search for target once per second
+
     private void Update()
     {
-        // Try to find target if we don't have one
+        // Try to find target if we don't have one (with cooldown to avoid expensive Find calls every frame)
         if (target == null && autoFindTarget)
         {
-            FindTarget();
+            targetSearchCooldown -= Time.deltaTime;
+            if (targetSearchCooldown <= 0f)
+            {
+                FindTarget();
+                targetSearchCooldown = TARGET_SEARCH_INTERVAL; // Reset cooldown
+            }
+        }
+        else if (target != null)
+        {
+            // Reset cooldown if we have a target
+            targetSearchCooldown = 0f;
         }
 
         // Only move if we have a target

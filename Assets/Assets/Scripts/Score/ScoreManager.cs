@@ -33,6 +33,9 @@ public class ScoreManager : MonoBehaviour
         if (Instance == null)
         {
             Instance = this;
+            // Keep ScoreManager alive across scene loads if needed
+            // Uncomment if you want persistent score across scenes:
+            // DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -76,7 +79,9 @@ public class ScoreManager : MonoBehaviour
 
         currentScore += amount;
         OnScoreChanged?.Invoke(currentScore);
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"Score: {currentScore} (+{amount})");
+        #endif
     }
 
     /// <summary>
@@ -86,7 +91,9 @@ public class ScoreManager : MonoBehaviour
     {
         currentScore = 0;
         OnScoreChanged?.Invoke(currentScore);
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log("Score reset to 0");
+        #endif
     }
 
     /// <summary>

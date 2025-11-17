@@ -64,7 +64,9 @@ public class EnemyHealth : MonoBehaviour
         // Notify listeners
         OnDamageTaken?.Invoke(damage);
 
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"{gameObject.name} took {damage} damage. Health: {currentHealth}/{maxHealth}");
+        #endif
 
         // Check if enemy died
         if (currentHealth <= 0f)
@@ -86,7 +88,9 @@ public class EnemyHealth : MonoBehaviour
             return;
 
         currentHealth = Mathf.Min(maxHealth, currentHealth + healAmount);
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"{gameObject.name} healed for {healAmount}. Health: {currentHealth}/{maxHealth}");
+        #endif
     }
 
     /// <summary>
@@ -114,7 +118,9 @@ public class EnemyHealth : MonoBehaviour
     /// </summary>
     private void Die()
     {
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"{gameObject.name} died!");
+        #endif
 
         // Award score for kill
         if (ScoreManager.Instance != null)

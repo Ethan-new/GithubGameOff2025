@@ -89,11 +89,14 @@ public class AmmoUI : MonoBehaviour
         }
 #endif
 
-        // Find PlayerController
-        playerController = FindFirstObjectByType<PlayerController>();
+        // Find PlayerController - cache reference to avoid expensive Find calls
         if (playerController == null)
         {
-            Debug.LogWarning("AmmoUI: No PlayerController found in scene. Ammo will not update.", this);
+            playerController = FindFirstObjectByType<PlayerController>();
+            if (playerController == null)
+            {
+                Debug.LogWarning("AmmoUI: No PlayerController found in scene. Ammo will not update.", this);
+            }
         }
 
         // Initialize display
@@ -102,37 +105,42 @@ public class AmmoUI : MonoBehaviour
 
     private void Update()
     {
-        // Update ammo display if weapon or ammo has changed
-        if (playerController != null)
+        // Re-find PlayerController if lost (e.g., after scene reload)
+        if (playerController == null)
         {
-            Weapon newWeapon = playerController.GetCurrentWeapon();
+            playerController = FindFirstObjectByType<PlayerController>();
+            if (playerController == null)
+                return;
+        }
+
+        // Update ammo display if weapon or ammo has changed
+        Weapon newWeapon = playerController.GetCurrentWeapon();
+        
+        // Check if weapon changed
+        if (newWeapon != currentWeapon)
+        {
+            currentWeapon = newWeapon;
+            UpdateAmmoDisplay();
+        }
+        // Check if ammo changed
+        else if (currentWeapon != null)
+        {
+            int currentAmmo = currentWeapon.CurrentAmmo;
+            int magazineSize = currentWeapon.MagazineSize;
             
-            // Check if weapon changed
-            if (newWeapon != currentWeapon)
+            if (currentAmmo != lastCurrentAmmo || magazineSize != lastMagazineSize)
             {
-                currentWeapon = newWeapon;
+                lastCurrentAmmo = currentAmmo;
+                lastMagazineSize = magazineSize;
                 UpdateAmmoDisplay();
             }
-            // Check if ammo changed
-            else if (currentWeapon != null)
-            {
-                int currentAmmo = currentWeapon.CurrentAmmo;
-                int magazineSize = currentWeapon.MagazineSize;
-                
-                if (currentAmmo != lastCurrentAmmo || magazineSize != lastMagazineSize)
-                {
-                    lastCurrentAmmo = currentAmmo;
-                    lastMagazineSize = magazineSize;
-                    UpdateAmmoDisplay();
-                }
-            }
-            // If no weapon, make sure display is updated
-            else if (currentWeapon == null && (lastCurrentAmmo != -1 || lastMagazineSize != -1))
-            {
-                lastCurrentAmmo = -1;
-                lastMagazineSize = -1;
-                UpdateAmmoDisplay();
-            }
+        }
+        // If no weapon, make sure display is updated
+        else if (currentWeapon == null && (lastCurrentAmmo != -1 || lastMagazineSize != -1))
+        {
+            lastCurrentAmmo = -1;
+            lastMagazineSize = -1;
+            UpdateAmmoDisplay();
         }
     }
 
@@ -219,6 +227,7 @@ public class AmmoUI : MonoBehaviour
         {
             int currentAmmo = currentWeapon.CurrentAmmo;
             int magazineSize = currentWeapon.MagazineSize;
+            // Use string.Format - it's optimized in Unity and handles format strings properly
             ammoString = string.Format(ammoFormat, currentAmmo, magazineSize);
         }
         else

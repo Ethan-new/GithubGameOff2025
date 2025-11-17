@@ -216,7 +216,9 @@ public class Weapon : MonoBehaviour
         Camera camera = GetCamera();
         if (camera == null)
         {
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.LogWarning($"{weaponName}: No camera found for raycast attack!");
+            #endif
             return;
         }
 
@@ -236,11 +238,15 @@ public class Weapon : MonoBehaviour
             {
                 finalDamage = damage * critZone.DamageMultiplier;
                 isCrit = true;
+                #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.Log($"{weaponName} CRIT HIT: {critZone.ZoneName} on {hit.collider.name} at distance {hit.distance:F2}m for {finalDamage} damage (x{critZone.DamageMultiplier})");
+                #endif
             }
             else
             {
+                #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.Log($"{weaponName} hit: {hit.collider.name} at distance {hit.distance:F2}m for {damage} damage");
+                #endif
             }
             
             // Apply damage to enemy if it has EnemyHealth component
@@ -271,7 +277,9 @@ public class Weapon : MonoBehaviour
         }
         else
         {
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"{weaponName} fired - no hit");
+            #endif
         }
 
         // Visual debug: Draw raycast in scene view
@@ -603,7 +611,9 @@ public class Weapon : MonoBehaviour
         isReloading = false;
         reloadCoroutine = null;
 
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"{weaponName} reloaded - {currentAmmo}/{magazineSize} ammo");
+        #endif
     }
 
     /// <summary>
