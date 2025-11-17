@@ -191,3 +191,17 @@ MonoBehaviour:
   reloadTime: 2
   reloadSound: {fileID: 0}
   reloadSoundVolume: 1
+  reloadTiltAngle: 45
+  reloadTiltAxis: {x: 0, y: 0, z: -1}
+  reloadPositionOffset: {x: 0, y: -0.2, z: 0}
+  reloadTiltCurve:
+    serializedVersion: 2
+    m_Curve: []
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reloadWalkBobSpeed: 8
+  reloadWalkBobAmount: 0.05
+  reloadWalkSwayAmount: 0.02
+  reloadWalkRotationSway: 1.5
+  reloadReturnDuration: 0.5

@@ -52,7 +52,14 @@ public class Weapon : MonoBehaviour
     [Header("Reload Animation Settings")]
     [SerializeField] protected float reloadTiltAngle = 45f; // How much the weapon tilts down during reload (in degrees)
     [SerializeField] protected Vector3 reloadTiltAxis = new Vector3(-1f, 0f, 0f); // Axis to tilt on (normalized direction). Default: negative X for downward tilt
+    [SerializeField] protected Vector3 reloadPositionOffset = new Vector3(0f, -0.2f, 0f); // How much the weapon moves down during reload (position offset)
     [SerializeField] protected AnimationCurve reloadTiltCurve; // Animation curve for reload tilt (0-1 over reload duration)
+    
+    [Header("Reload Walk Shake Settings")]
+    [SerializeField] protected float reloadWalkBobSpeed = 8f; // Speed of the walk bob animation during reload
+    [SerializeField] protected float reloadWalkBobAmount = 0.05f; // How much the weapon bobs up and down while reloading
+    [SerializeField] protected float reloadWalkSwayAmount = 0.02f; // How much the weapon sways side to side while reloading
+    [SerializeField] protected float reloadWalkRotationSway = 1.5f; // How much the weapon rotates side to side while reloading
 
     protected float lastAttackTime = 0f;
     protected bool isEquipped = false;
@@ -498,8 +505,9 @@ public class Weapon : MonoBehaviour
             audioSource.PlayOneShot(reloadSound, reloadSoundVolume);
         }
 
-        // Use the base local rotation (which includes weapon offsets) for reload animation
+        // Use the base local position and rotation (which includes weapon offsets) for reload animation
         // This ensures consistency with how recoil and other animations work
+        Vector3 basePosition = baseLocalPosition;
         Quaternion baseRotation = baseLocalRotation;
         // Normalize the tilt axis and apply the angle
         Vector3 normalizedAxis = reloadTiltAxis.normalized;
@@ -517,35 +525,81 @@ public class Weapon : MonoBehaviour
             );
         }
 
-        // Animate reload tilt
+        // Animate reload tilt and position with walk shake
         float elapsedTime = 0f;
+        float walkShakeTime = 0f; // Time accumulator for walk shake animation
+        
         while (elapsedTime < reloadTime)
         {
             elapsedTime += Time.deltaTime;
             float normalizedTime = Mathf.Clamp01(elapsedTime / reloadTime);
             float curveValue = reloadTiltCurve.Evaluate(normalizedTime);
 
+            // Update walk shake time
+            walkShakeTime += Time.deltaTime * reloadWalkBobSpeed;
+
+            // Calculate walk shake offsets (bob and sway)
+            float bobOffset = Mathf.Sin(walkShakeTime) * reloadWalkBobAmount;
+            float swayOffset = Mathf.Sin(walkShakeTime * 0.5f) * reloadWalkSwayAmount;
+            float rotationSway = Mathf.Sin(walkShakeTime * 0.5f) * reloadWalkRotationSway;
+
             // Apply tilt rotation based on curve, relative to base rotation (which includes offsets)
             Vector3 currentTilt = reloadTiltRotation * curveValue;
-            Quaternion targetRotation = baseRotation * Quaternion.Euler(currentTilt);
+            
+            // Apply position offset based on curve (gun goes down during reload)
+            Vector3 reloadPosition = reloadPositionOffset * curveValue;
+            
+            // Add walk shake to position (bob and sway)
+            Vector3 walkShakeOffset = new Vector3(swayOffset, bobOffset, 0f);
+            Vector3 targetPosition = basePosition + reloadPosition + walkShakeOffset;
+            
+            // Combine reload tilt with walk shake rotation
+            Quaternion targetRotation = baseRotation * Quaternion.Euler(currentTilt) * Quaternion.Euler(0f, rotationSway, 0f);
             
             // Only update transform if we're allowed to (not when external animations are controlling it)
             if (allowRecoilTransformUpdate)
             {
+                transform.localPosition = targetPosition;
                 transform.localRotation = targetRotation;
             }
 
             yield return null;
         }
 
-        // Ensure we're back at base rotation (which includes offsets)
-        if (allowRecoilTransformUpdate)
-        {
-            transform.localRotation = baseRotation;
-        }
-
         // Refill magazine
         currentAmmo = magazineSize;
+
+        // Smoothly transition back to base position before ending reload to prevent snap
+        // This ensures PlayerController can smoothly take over control
+        float transitionTime = 0.15f; // Brief transition period
+        float transitionElapsed = 0f;
+        Vector3 startPosition = transform.localPosition;
+        Quaternion startRotation = transform.localRotation;
+
+        while (transitionElapsed < transitionTime)
+        {
+            transitionElapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(transitionElapsed / transitionTime);
+            // Smooth ease-out transition
+            t = 1f - Mathf.Pow(1f - t, 3f); // Cubic ease-out
+
+            if (allowRecoilTransformUpdate)
+            {
+                transform.localPosition = Vector3.Lerp(startPosition, baseLocalPosition, t);
+                transform.localRotation = Quaternion.Lerp(startRotation, baseLocalRotation, t);
+            }
+
+            yield return null;
+        }
+
+        // Ensure we're exactly at base position/rotation
+        if (allowRecoilTransformUpdate)
+        {
+            transform.localPosition = baseLocalPosition;
+            transform.localRotation = baseLocalRotation;
+        }
+
+        // Now set reloading to false - PlayerController can smoothly take over
         isReloading = false;
         reloadCoroutine = null;
 
@@ -563,12 +617,6 @@ public class Weapon : MonoBehaviour
             reloadCoroutine = null;
         }
         isReloading = false;
-        
-        // Restore base rotation (which includes offsets) if we're controlling the transform
-        if (allowRecoilTransformUpdate)
-        {
-            transform.localRotation = baseLocalRotation;
-        }
     }
 
     protected virtual void Awake()
