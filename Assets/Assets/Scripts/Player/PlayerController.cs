@@ -57,6 +57,7 @@ public class PlayerController : MonoBehaviour
     private InputAction previousWeaponAction;
     private InputAction nextWeaponAction;
     private InputAction interactAction;
+    private InputAction reloadAction;
     private Vector2 moveInput;
     private Vector2 lookInput;
     private bool isSprinting;
@@ -64,6 +65,7 @@ public class PlayerController : MonoBehaviour
     private bool attackPressed;
     private bool attackPressedThisFrame; // For single fire weapons
     private bool interactPressed;
+    private bool reloadPressed;
 
     private float horizontalRotation = 0f;
     private float verticalRotation = 0f;
@@ -97,6 +99,7 @@ public class PlayerController : MonoBehaviour
                 previousWeaponAction = playerActionMap.FindAction("Previous");
                 nextWeaponAction = playerActionMap.FindAction("Next");
                 interactAction = playerActionMap.FindAction("Interact");
+                reloadAction = playerActionMap.FindAction("Reload");
 
                 // Debug log to verify interact action is found
                 if (interactAction == null)
@@ -255,6 +258,12 @@ public class PlayerController : MonoBehaviour
                 interactAction.performed += OnInteract;
                 interactAction.canceled += OnInteract;
             }
+
+            if (reloadAction != null)
+            {
+                reloadAction.performed += OnReload;
+                reloadAction.canceled += OnReload;
+            }
         }
 
         // Lock and hide cursor
@@ -308,6 +317,12 @@ public class PlayerController : MonoBehaviour
         {
             interactAction.performed -= OnInteract;
             interactAction.canceled -= OnInteract;
+        }
+
+        if (reloadAction != null)
+        {
+            reloadAction.performed -= OnReload;
+            reloadAction.canceled -= OnReload;
         }
 
         if (playerActionMap != null)
@@ -374,6 +389,11 @@ public class PlayerController : MonoBehaviour
         interactPressed = context.performed;
     }
 
+    private void OnReload(InputAction.CallbackContext context)
+    {
+        reloadPressed = context.performed;
+    }
+
     private void Update()
     {
         // Ensure cursor stays locked during gameplay
@@ -387,6 +407,7 @@ public class PlayerController : MonoBehaviour
         HandleMovement();
         HandleAttack();
         HandleInteract();
+        HandleReload();
     }
 
     private void HandleMouseLook()
@@ -515,6 +536,19 @@ public class PlayerController : MonoBehaviour
             Debug.Log("Interact pressed - attempting to pick up weapon");
             TryPickupWeapon();
             interactPressed = false; // Reset interact input
+        }
+    }
+
+    private void HandleReload()
+    {
+        if (reloadPressed)
+        {
+            Weapon currentWeapon = GetCurrentWeapon();
+            if (currentWeapon != null && currentWeapon.IsEquipped)
+            {
+                currentWeapon.Reload();
+            }
+            reloadPressed = false; // Reset reload input
         }
     }
 

@@ -187,3 +187,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   queryTriggerInteraction: 1
+  magazineSize: 12
+  reloadTime: 2
+  reloadSound: {fileID: 0}
+  reloadSoundVolume: 1

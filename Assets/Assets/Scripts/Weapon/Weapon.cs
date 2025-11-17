@@ -43,9 +43,18 @@ public class Weapon : MonoBehaviour
     [SerializeField] protected LayerMask hitLayers = -1; // All layers by default
     [SerializeField] protected QueryTriggerInteraction queryTriggerInteraction = QueryTriggerInteraction.Ignore;
 
+    [Header("Ammo Settings")]
+    [SerializeField] protected int magazineSize = 30; // Maximum ammo in magazine (configurable in editor)
+    [SerializeField] protected float reloadTime = 2f; // Time it takes to reload (in seconds)
+    [SerializeField] protected AudioClip reloadSound; // Sound played when reloading
+    [SerializeField] protected float reloadSoundVolume = 1f; // Volume of the reload sound (0-1)
+
     protected float lastAttackTime = 0f;
     protected bool isEquipped = false;
     protected Camera playerCamera;
+    protected int currentAmmo; // Current ammo in magazine
+    protected bool isReloading = false; // Whether the weapon is currently reloading
+    private Coroutine reloadCoroutine = null;
     private Coroutine recoilCoroutine = null;
     private Vector3 baseLocalPosition;
     private Quaternion baseLocalRotation;
@@ -74,6 +83,21 @@ public class Weapon : MonoBehaviour
     public FireMode FireMode => fireMode;
 
     /// <summary>
+    /// The current ammo in the magazine.
+    /// </summary>
+    public int CurrentAmmo => currentAmmo;
+
+    /// <summary>
+    /// The maximum ammo capacity of the magazine.
+    /// </summary>
+    public int MagazineSize => magazineSize;
+
+    /// <summary>
+    /// Whether the weapon is currently reloading.
+    /// </summary>
+    public bool IsReloading => isReloading;
+
+    /// <summary>
     /// Called when the weapon is equipped.
     /// </summary>
     public virtual void OnEquip()
@@ -85,6 +109,12 @@ public class Weapon : MonoBehaviour
         // Store base position/rotation for recoil
         baseLocalPosition = positionOffset;
         baseLocalRotation = Quaternion.Euler(rotationOffset);
+        
+        // Initialize ammo if not already set
+        if (currentAmmo == 0 && magazineSize > 0)
+        {
+            currentAmmo = magazineSize;
+        }
     }
 
     /// <summary>
@@ -128,11 +158,23 @@ public class Weapon : MonoBehaviour
 
     /// <summary>
     /// Attempts to attack with this weapon. Returns true if the attack was successful.
-    /// Note: Recoil animation does not prevent firing - only the cooldown limits fire rate.
+    /// Note: Recoil animation does not prevent firing - only the cooldown and ammo limit fire rate.
     /// You can fire again as soon as the cooldown expires, even if recoil is still playing.
     /// </summary>
     public virtual bool Attack()
     {
+        // Check if weapon is reloading
+        if (isReloading)
+        {
+            return false;
+        }
+
+        // Check if weapon has ammo
+        if (currentAmmo <= 0)
+        {
+            return false;
+        }
+
         // Check cooldown (this is the only thing preventing rapid fire)
         if (Time.time - lastAttackTime < attackCooldown)
         {
@@ -141,6 +183,7 @@ public class Weapon : MonoBehaviour
 
         // Perform attack
         lastAttackTime = Time.time;
+        currentAmmo--; // Consume ammo
         PerformAttack();
         
         // Play fire sound
@@ -400,6 +443,80 @@ public class Weapon : MonoBehaviour
         audioSource.PlayOneShot(fireSound, fireSoundVolume);
     }
 
+    /// <summary>
+    /// Attempts to reload the weapon. Returns true if reload was started.
+    /// </summary>
+    public virtual bool Reload()
+    {
+        // Can't reload if already reloading
+        if (isReloading)
+        {
+            return false;
+        }
+
+        // Can't reload if magazine is already full
+        if (currentAmmo >= magazineSize)
+        {
+            return false;
+        }
+
+        // Start reload coroutine
+        if (reloadCoroutine != null)
+        {
+            StopCoroutine(reloadCoroutine);
+        }
+        reloadCoroutine = StartCoroutine(ReloadCoroutine());
+        
+        return true;
+    }
+
+    /// <summary>
+    /// Coroutine that handles the reload process.
+    /// </summary>
+    protected virtual System.Collections.IEnumerator ReloadCoroutine()
+    {
+        isReloading = true;
+
+        // Play reload sound if available
+        if (reloadSound != null)
+        {
+            if (audioSource == null)
+            {
+                audioSource = GetComponent<AudioSource>();
+                if (audioSource == null)
+                {
+                    audioSource = gameObject.AddComponent<AudioSource>();
+                    audioSource.playOnAwake = false;
+                    audioSource.spatialBlend = 0f;
+                }
+            }
+            audioSource.PlayOneShot(reloadSound, reloadSoundVolume);
+        }
+
+        // Wait for reload time
+        yield return new WaitForSeconds(reloadTime);
+
+        // Refill magazine
+        currentAmmo = magazineSize;
+        isReloading = false;
+        reloadCoroutine = null;
+
+        Debug.Log($"{weaponName} reloaded - {currentAmmo}/{magazineSize} ammo");
+    }
+
+    /// <summary>
+    /// Cancels the current reload operation.
+    /// </summary>
+    public void CancelReload()
+    {
+        if (reloadCoroutine != null)
+        {
+            StopCoroutine(reloadCoroutine);
+            reloadCoroutine = null;
+        }
+        isReloading = false;
+    }
+
     protected virtual void Awake()
     {
         // Find fire point if not assigned
@@ -411,6 +528,9 @@ public class Weapon : MonoBehaviour
         // Initialize base position/rotation
         baseLocalPosition = positionOffset;
         baseLocalRotation = Quaternion.Euler(rotationOffset);
+        
+        // Initialize ammo to full magazine
+        currentAmmo = magazineSize;
         
         // Initialize default animation curves if not set
         if (recoilCurve == null || recoilCurve.length == 0)
@@ -436,6 +556,9 @@ public class Weapon : MonoBehaviour
     {
         // Stop recoil animation if weapon is disabled
         StopRecoil();
+        
+        // Cancel reload if weapon is disabled
+        CancelReload();
     }
 }
 
