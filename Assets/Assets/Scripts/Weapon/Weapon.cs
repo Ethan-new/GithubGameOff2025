@@ -51,6 +51,7 @@ public class Weapon : MonoBehaviour
     private Quaternion baseLocalRotation;
     private float currentRecoilAmount = 0f; // Current recoil stack (0 to maxRecoilStack)
     private AudioSource audioSource; // Audio source for playing sounds
+    private bool allowRecoilTransformUpdate = true; // Whether recoil can directly update transform (false when external animations are controlling it)
 
     /// <summary>
     /// The name of the weapon.
@@ -171,10 +172,34 @@ public class Weapon : MonoBehaviour
         RaycastHit hit;
         if (Physics.Raycast(rayOrigin, rayDirection, out hit, attackRange, hitLayers, queryTriggerInteraction))
         {
-            Debug.Log($"{weaponName} hit: {hit.collider.name} at distance {hit.distance:F2}m for {damage} damage");
+            // Check for crit zone on the hit collider
+            CritZone critZone = hit.collider.GetComponent<CritZone>();
+            float finalDamage = damage;
+            bool isCrit = false;
             
-            // TODO: Apply damage to hit target when damage system is implemented
-            // Example: hit.collider.GetComponent<IDamageable>()?.TakeDamage(damage);
+            if (critZone != null)
+            {
+                finalDamage = damage * critZone.DamageMultiplier;
+                isCrit = true;
+                Debug.Log($"{weaponName} CRIT HIT: {critZone.ZoneName} on {hit.collider.name} at distance {hit.distance:F2}m for {finalDamage} damage (x{critZone.DamageMultiplier})");
+            }
+            else
+            {
+                Debug.Log($"{weaponName} hit: {hit.collider.name} at distance {hit.distance:F2}m for {damage} damage");
+            }
+            
+            // Apply damage to enemy if it has EnemyHealth component
+            EnemyHealth enemyHealth = hit.collider.GetComponent<EnemyHealth>();
+            if (enemyHealth == null)
+            {
+                // Try to get it from parent in case the collider is a child object
+                enemyHealth = hit.collider.GetComponentInParent<EnemyHealth>();
+            }
+            
+            if (enemyHealth != null)
+            {
+                enemyHealth.TakeDamage(finalDamage);
+            }
         }
         else
         {
@@ -248,14 +273,18 @@ public class Weapon : MonoBehaviour
         // Continuous loop that handles both recoil application and recovery
         while (currentRecoilAmount > 0f)
         {
-            // Apply current recoil amount smoothly
-            float recoilMultiplier = currentRecoilAmount;
-            Vector3 targetPosition = baseLocalPosition + (recoilPosition * recoilMultiplier);
-            Quaternion targetRotation = baseLocalRotation * Quaternion.Euler(recoilRotation * recoilMultiplier);
+            // Only update transform directly if allowed (not when external animations are controlling it)
+            if (allowRecoilTransformUpdate)
+            {
+                // Apply current recoil amount smoothly
+                float recoilMultiplier = currentRecoilAmount;
+                Vector3 targetPosition = baseLocalPosition + (recoilPosition * recoilMultiplier);
+                Quaternion targetRotation = baseLocalRotation * Quaternion.Euler(recoilRotation * recoilMultiplier);
 
-            // Smoothly interpolate to target position
-            transform.localPosition = Vector3.Lerp(transform.localPosition, targetPosition, Time.deltaTime * 20f);
-            transform.localRotation = Quaternion.Lerp(transform.localRotation, targetRotation, Time.deltaTime * 20f);
+                // Smoothly interpolate to target position
+                transform.localPosition = Vector3.Lerp(transform.localPosition, targetPosition, Time.deltaTime * 20f);
+                transform.localRotation = Quaternion.Lerp(transform.localRotation, targetRotation, Time.deltaTime * 20f);
+            }
 
             // Reduce recoil stack over time (recovery)
             currentRecoilAmount = Mathf.Max(0f, currentRecoilAmount - recoverySpeed * Time.deltaTime);
@@ -263,9 +292,12 @@ public class Weapon : MonoBehaviour
             yield return null;
         }
 
-        // Ensure we're exactly at base position/rotation
-        transform.localPosition = baseLocalPosition;
-        transform.localRotation = baseLocalRotation;
+        // Ensure we're exactly at base position/rotation (only if we're controlling the transform)
+        if (allowRecoilTransformUpdate)
+        {
+            transform.localPosition = baseLocalPosition;
+            transform.localRotation = baseLocalRotation;
+        }
         currentRecoilAmount = 0f;
 
         recoilCoroutine = null;
@@ -285,6 +317,49 @@ public class Weapon : MonoBehaviour
         currentRecoilAmount = 0f;
         transform.localPosition = baseLocalPosition;
         transform.localRotation = baseLocalRotation;
+    }
+
+    /// <summary>
+    /// Checks if the weapon currently has active recoil animation.
+    /// </summary>
+    public bool HasActiveRecoil()
+    {
+        return recoilCoroutine != null && currentRecoilAmount > 0f;
+    }
+
+    /// <summary>
+    /// Gets the current recoil position offset (for combining with other animations).
+    /// </summary>
+    public Vector3 GetRecoilPositionOffset()
+    {
+        if (currentRecoilAmount > 0f)
+        {
+            float recoilMultiplier = currentRecoilAmount;
+            return recoilPosition * recoilMultiplier;
+        }
+        return Vector3.zero;
+    }
+
+    /// <summary>
+    /// Gets the current recoil rotation offset (for combining with other animations).
+    /// </summary>
+    public Vector3 GetRecoilRotationOffset()
+    {
+        if (currentRecoilAmount > 0f)
+        {
+            float recoilMultiplier = currentRecoilAmount;
+            return recoilRotation * recoilMultiplier;
+        }
+        return Vector3.zero;
+    }
+
+    /// <summary>
+    /// Sets whether the recoil animation can directly update the transform.
+    /// Set to false when external animations (like walk) are controlling the transform.
+    /// </summary>
+    public void SetAllowRecoilTransformUpdate(bool allow)
+    {
+        allowRecoilTransformUpdate = allow;
     }
 
     /// <summary>

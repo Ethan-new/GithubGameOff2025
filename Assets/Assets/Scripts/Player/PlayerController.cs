@@ -33,6 +33,20 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private Vector3 swapHideOffset = new Vector3(0f, -0.5f, 0.5f); // Where to move weapon when hiding
     [SerializeField] private Vector3 swapShowOffset = new Vector3(0f, -0.5f, 0.5f); // Where to start new weapon from
 
+    [Header("Sprinting Animation")]
+    [SerializeField] private float sprintBobSpeed = 10f; // Speed of the sprint bob animation
+    [SerializeField] private float sprintBobAmount = 0.1f; // How much the weapon bobs up and down while sprinting
+    [SerializeField] private float sprintSwayAmount = 0.05f; // How much the weapon sways side to side while sprinting
+    [SerializeField] private float sprintAnimationTransitionSpeed = 5f; // How fast the animation transitions in/out
+    [SerializeField] private Vector3 sprintPositionOffset = new Vector3(-0.3f, 0f, -0.1f); // Position offset when sprinting (across chest - to the side)
+    [SerializeField] private Vector3 sprintRotationOffset = new Vector3(0f, -90f, 0f); // Rotation offset when sprinting (pointing to the left)
+
+    [Header("Walking Animation")]
+    [SerializeField] private float walkBobSpeed = 8f; // Speed of the walk bob animation
+    [SerializeField] private float walkBobAmount = 0.05f; // How much the weapon bobs up and down while walking (subtle)
+    [SerializeField] private float walkSwayAmount = 0.02f; // How much the weapon sways side to side while walking (subtle)
+    [SerializeField] private float walkAnimationTransitionSpeed = 5f; // How fast the animation transitions in/out
+
     private CharacterController characterController;
     private InputActionMap playerActionMap;
     private InputAction moveAction;
@@ -60,6 +74,10 @@ public class PlayerController : MonoBehaviour
     private int currentWeaponIndex = -1; // -1 means no weapon equipped
     private bool isSwappingWeapon = false; // Track if swap animation is in progress
     private Coroutine swapAnimationCoroutine = null;
+    private float sprintAnimationTime = 0f; // Time accumulator for sprint animation
+    private float sprintAnimationIntensity = 0f; // Current intensity of sprint animation (0-1)
+    private float walkAnimationTime = 0f; // Time accumulator for walk animation
+    private float walkAnimationIntensity = 0f; // Current intensity of walk animation (0-1)
 
     private void Awake()
     {
@@ -79,7 +97,7 @@ public class PlayerController : MonoBehaviour
                 previousWeaponAction = playerActionMap.FindAction("Previous");
                 nextWeaponAction = playerActionMap.FindAction("Next");
                 interactAction = playerActionMap.FindAction("Interact");
-                
+
                 // Debug log to verify interact action is found
                 if (interactAction == null)
                 {
@@ -102,7 +120,7 @@ public class PlayerController : MonoBehaviour
 
         // Initialize weapon inventory
         weaponInventory = new Weapon[maxWeapons];
-        
+
         // Setup camera - ensure it's a child of the player (do this first so weapon holder can be parented to it)
         if (playerCamera == null)
         {
@@ -128,7 +146,7 @@ public class PlayerController : MonoBehaviour
             }
             playerCamera.transform.localRotation = Quaternion.identity;
         }
-        
+
         // Setup weapon holder if not assigned (after camera is set up)
         if (weaponHolder == null)
         {
@@ -149,7 +167,7 @@ public class PlayerController : MonoBehaviour
                 weaponHolder.localRotation = Quaternion.identity;
             }
         }
-        
+
         // Ensure weapon holder is active
         if (weaponHolder != null)
         {
@@ -463,7 +481,7 @@ public class PlayerController : MonoBehaviour
 
         // Check fire mode and handle accordingly
         bool shouldAttack = false;
-        
+
         if (currentWeapon.FireMode == FireMode.SingleFire)
         {
             // Single fire: only attack on button press (not while held)
@@ -478,6 +496,13 @@ public class PlayerController : MonoBehaviour
 
         if (shouldAttack)
         {
+            // Check if player is sprinting - prevent shooting while sprinting
+            if (isSprinting)
+            {
+                // Shooting is blocked while sprinting (animation is handled by HandleSprintAnimation)
+                return;
+            }
+
             // Try to attack - the weapon's cooldown will handle rate limiting
             currentWeapon.Attack();
         }
@@ -500,21 +525,21 @@ public class PlayerController : MonoBehaviour
     {
         // Get the player's position (use camera position for more accurate detection)
         Vector3 checkPosition = playerCamera != null ? playerCamera.transform.position : transform.position;
-        
+
         Debug.Log($"Checking for weapons at position: {checkPosition}, range: {pickupRange}, layer mask: {weaponLayerMask.value}");
-        
+
         // Use overlap sphere to find nearby weapons - try without layer mask first if nothing found
         Collider[] colliders = Physics.OverlapSphere(checkPosition, pickupRange, weaponLayerMask);
-        
+
         // If no colliders found with layer mask, try without layer mask
         if (colliders.Length == 0)
         {
             Debug.Log("No colliders found with layer mask, trying without layer mask");
             colliders = Physics.OverlapSphere(checkPosition, pickupRange);
         }
-        
+
         Debug.Log($"Found {colliders.Length} colliders in range");
-        
+
         GroundWeapon nearestGroundWeapon = null;
         float nearestDistance = float.MaxValue;
 
@@ -522,23 +547,23 @@ public class PlayerController : MonoBehaviour
         foreach (Collider col in colliders)
         {
             if (col == null) continue;
-            
+
             // Check for GroundWeapon component on this object or parent
             GroundWeapon groundWeapon = col.GetComponent<GroundWeapon>();
             if (groundWeapon == null)
             {
                 groundWeapon = col.GetComponentInParent<GroundWeapon>();
             }
-            
+
             if (groundWeapon != null)
             {
                 float distance = Vector3.Distance(checkPosition, groundWeapon.transform.position);
-                
+
                 // Use the larger of pickupRange or the weapon's pickup radius
                 float effectiveRange = Mathf.Max(pickupRange, groundWeapon.PickupRadius);
-                
+
                 Debug.Log($"Found GroundWeapon: {groundWeapon.name}, distance: {distance}, effective range: {effectiveRange}");
-                
+
                 if (distance <= effectiveRange && distance < nearestDistance)
                 {
                     nearestDistance = distance;
@@ -552,7 +577,7 @@ public class PlayerController : MonoBehaviour
             Debug.LogWarning("No ground weapon found in range");
             return;
         }
-        
+
         Debug.Log($"Found nearest weapon: {nearestGroundWeapon.name}");
 
         Weapon weaponToPickup = nearestGroundWeapon.Weapon;
@@ -561,7 +586,7 @@ public class PlayerController : MonoBehaviour
 
         // Check if there's an empty slot
         int emptySlot = FindEmptySlot();
-        
+
         if (emptySlot >= 0)
         {
             // Pick up weapon into empty slot
@@ -652,7 +677,7 @@ public class PlayerController : MonoBehaviour
         // Position weapon in front of player
         Vector3 dropPosition = transform.position + transform.forward * 1f;
         dropPosition.y = transform.position.y; // Keep at ground level
-        
+
         weapon.transform.position = dropPosition;
         weapon.transform.rotation = Quaternion.identity;
 
@@ -699,7 +724,7 @@ public class PlayerController : MonoBehaviour
         {
             nextIndex = (nextIndex - 1 + weaponInventory.Length) % weaponInventory.Length;
             attempts++;
-            
+
             if (attempts >= weaponInventory.Length)
                 return; // No weapons available
         }
@@ -730,7 +755,7 @@ public class PlayerController : MonoBehaviour
         {
             nextIndex = (nextIndex + 1) % weaponInventory.Length;
             attempts++;
-            
+
             if (attempts >= weaponInventory.Length)
                 return; // No weapons available
         }
@@ -764,13 +789,13 @@ public class PlayerController : MonoBehaviour
                 newWeapon.transform.localPosition = Vector3.zero;
                 newWeapon.transform.localRotation = Quaternion.identity;
             }
-            
+
             // Ensure weapon is active and visible
             newWeapon.gameObject.SetActive(true);
-            
+
             // Apply position offset
             newWeapon.OnEquip();
-            
+
             Debug.Log($"Equipped {newWeapon.WeaponName} immediately");
         }
     }
@@ -825,11 +850,11 @@ public class PlayerController : MonoBehaviour
                 newWeapon.transform.SetParent(weaponHolder);
             }
             newWeapon.gameObject.SetActive(true);
-            
+
             // Get target position/rotation for new weapon
             Vector3 targetPosition = newWeapon.GetPositionOffset();
             Quaternion targetRotation = Quaternion.Euler(newWeapon.GetRotationOffset());
-            
+
             // Start new weapon from hidden position
             newWeapon.transform.localPosition = targetPosition + swapShowOffset;
             newWeapon.transform.localRotation = targetRotation;
@@ -868,7 +893,7 @@ public class PlayerController : MonoBehaviour
                 Vector3 targetPosition = newWeapon.GetPositionOffset();
                 Quaternion targetRotation = Quaternion.Euler(newWeapon.GetRotationOffset());
                 Vector3 startPosition = targetPosition + swapShowOffset;
-                
+
                 newWeapon.transform.localPosition = Vector3.Lerp(startPosition, targetPosition, curveValue);
                 newWeapon.transform.localRotation = Quaternion.Lerp(Quaternion.Euler(newWeapon.GetRotationOffset()), targetRotation, curveValue);
             }
@@ -945,27 +970,27 @@ public class PlayerController : MonoBehaviour
 
         // Add the new weapon
         weaponInventory[slot] = weaponInstance;
-        
+
         // Ensure weapon GameObject is active
         weaponInstance.gameObject.SetActive(true);
-        
+
         // Disable collider when in inventory (no longer needs physics)
         Collider weaponCollider = weaponInstance.GetComponent<Collider>();
         if (weaponCollider != null)
         {
             weaponCollider.enabled = false;
         }
-        
+
         // Remove GroundWeapon component if it exists (no longer on ground)
         GroundWeapon groundWeapon = weaponInstance.GetComponent<GroundWeapon>();
         if (groundWeapon != null)
         {
             Destroy(groundWeapon);
         }
-        
+
         // Parent to weapon holder first
         weaponInstance.transform.SetParent(weaponHolder);
-        
+
         // Reset transform before applying offset
         weaponInstance.transform.localPosition = Vector3.zero;
         weaponInstance.transform.localRotation = Quaternion.identity;
@@ -1042,17 +1067,159 @@ public class PlayerController : MonoBehaviour
         return null;
     }
 
+    private void LateUpdate()
+    {
+        // Run sprint animation in LateUpdate so it applies after recoil animations
+        HandleSprintAnimation();
+    }
+
     private void OnDestroy()
     {
         // InputActionAsset cleanup is handled by Unity
+    }
+
+    /// <summary>
+    /// Handles the sprinting and walking animations on the weapon.
+    /// Runs in LateUpdate so it applies after recoil animations.
+    /// </summary>
+    private void HandleSprintAnimation()
+    {
+        Weapon currentWeapon = GetCurrentWeapon();
+        if (currentWeapon == null || !currentWeapon.IsEquipped)
+        {
+            sprintAnimationIntensity = 0f;
+            sprintAnimationTime = 0f;
+            walkAnimationIntensity = 0f;
+            walkAnimationTime = 0f;
+            return;
+        }
+
+        // Check if player is moving
+        bool isMoving = moveInput.sqrMagnitude > 0.01f;
+
+        // Update sprint animation intensity (smooth transition)
+        float targetSprintIntensity = (isSprinting && isMoving) ? 1f : 0f;
+        sprintAnimationIntensity = Mathf.MoveTowards(sprintAnimationIntensity, targetSprintIntensity, sprintAnimationTransitionSpeed * Time.deltaTime);
+
+        // Update walk animation intensity (only if moving but not sprinting)
+        float targetWalkIntensity = (isMoving && !isSprinting) ? 1f : 0f;
+        walkAnimationIntensity = Mathf.MoveTowards(walkAnimationIntensity, targetWalkIntensity, walkAnimationTransitionSpeed * Time.deltaTime);
+
+        // Get base position/rotation (weapon's position offset)
+        Vector3 basePosition = currentWeapon.GetPositionOffset();
+        Quaternion baseRotation = Quaternion.Euler(currentWeapon.GetRotationOffset());
+
+        Vector3 totalAnimationOffset = Vector3.zero;
+        Vector3 totalRotationOffset = Vector3.zero;
+
+        // Apply sprint animation if active
+        if (sprintAnimationIntensity > 0.01f)
+        {
+            // Update animation time
+            sprintAnimationTime += Time.deltaTime * sprintBobSpeed;
+
+            // Interpolate to sprint position (across chest)
+            Vector3 sprintPosition = basePosition + sprintPositionOffset;
+            Vector3 targetPosition = Vector3.Lerp(basePosition, sprintPosition, sprintAnimationIntensity);
+
+            // Interpolate to sprint rotation (angled across chest)
+            Quaternion sprintRotation = baseRotation * Quaternion.Euler(sprintRotationOffset);
+            Quaternion targetRotation = Quaternion.Lerp(baseRotation, sprintRotation, sprintAnimationIntensity);
+
+            // Calculate bob (vertical movement) - applied on top of sprint position
+            float bobOffset = Mathf.Sin(sprintAnimationTime) * sprintBobAmount * sprintAnimationIntensity;
+
+            // Calculate sway (horizontal movement) - applied on top of sprint position
+            float swayOffset = Mathf.Sin(sprintAnimationTime * 0.5f) * sprintSwayAmount * sprintAnimationIntensity;
+
+            // Combine sprint position with bob/sway
+            totalAnimationOffset = (targetPosition - basePosition) + new Vector3(swayOffset, bobOffset, 0f);
+        }
+        else
+        {
+            sprintAnimationTime = 0f;
+        }
+
+        // Apply walk animation if active (and not sprinting)
+        if (walkAnimationIntensity > 0.01f && sprintAnimationIntensity < 0.01f)
+        {
+            // Update animation time
+            walkAnimationTime += Time.deltaTime * walkBobSpeed;
+
+            // Calculate subtle bob (vertical movement)
+            float bobOffset = Mathf.Sin(walkAnimationTime) * walkBobAmount * walkAnimationIntensity;
+
+            // Calculate subtle sway (horizontal movement)
+            float swayOffset = Mathf.Sin(walkAnimationTime * 0.5f) * walkSwayAmount * walkAnimationIntensity;
+
+            totalAnimationOffset += new Vector3(swayOffset, bobOffset, 0f);
+
+            // Add very subtle rotation
+            float rotationSway = Mathf.Sin(walkAnimationTime * 0.5f) * 1.5f * walkAnimationIntensity;
+            totalRotationOffset += new Vector3(0f, rotationSway, 0f);
+        }
+        else
+        {
+            walkAnimationTime = 0f;
+        }
+
+        // Disable recoil transform updates when we're controlling the transform with walk/sprint animations
+        bool isControllingTransform = sprintAnimationIntensity > 0.01f || walkAnimationIntensity > 0.01f;
+        currentWeapon.SetAllowRecoilTransformUpdate(!isControllingTransform);
+
+        // Apply combined animation offset
+        if (sprintAnimationIntensity > 0.01f)
+        {
+            // Sprint animation (includes position across chest)
+            currentWeapon.transform.localPosition = basePosition + totalAnimationOffset;
+            // For sprint, use the interpolated rotation with sway
+            Quaternion sprintRotation = baseRotation * Quaternion.Euler(sprintRotationOffset);
+            Quaternion targetSprintRotation = Quaternion.Lerp(baseRotation, sprintRotation, sprintAnimationIntensity);
+            float rotationSway = Mathf.Sin(sprintAnimationTime * 0.5f) * 3f * sprintAnimationIntensity;
+            currentWeapon.transform.localRotation = targetSprintRotation * Quaternion.Euler(0f, rotationSway, 0f);
+        }
+        else if (walkAnimationIntensity > 0.01f)
+        {
+            // Walk animation (additive to recoil)
+            // Calculate the position with both recoil and walk animation
+            Vector3 recoilOffset = currentWeapon.GetRecoilPositionOffset();
+            Vector3 finalPosition = basePosition + recoilOffset + totalAnimationOffset;
+
+            // Calculate the rotation with both recoil and walk animation
+            Vector3 recoilRotationOffset = currentWeapon.GetRecoilRotationOffset();
+            Quaternion recoilRotation = baseRotation * Quaternion.Euler(recoilRotationOffset);
+            Quaternion finalRotation = recoilRotation * Quaternion.Euler(totalRotationOffset);
+
+            currentWeapon.transform.localPosition = finalPosition;
+            currentWeapon.transform.localRotation = finalRotation;
+        }
+        else
+        {
+            // When not moving, smoothly return to base position if no active recoil
+            // If there's active recoil, let the recoil system handle it
+            if (!currentWeapon.HasActiveRecoil())
+            {
+                // Smoothly return to base position
+                currentWeapon.transform.localPosition = Vector3.Lerp(
+                    currentWeapon.transform.localPosition,
+                    basePosition,
+                    Mathf.Max(sprintAnimationTransitionSpeed, walkAnimationTransitionSpeed) * Time.deltaTime
+                );
+                currentWeapon.transform.localRotation = Quaternion.Lerp(
+                    currentWeapon.transform.localRotation,
+                    baseRotation,
+                    Mathf.Max(sprintAnimationTransitionSpeed, walkAnimationTransitionSpeed) * Time.deltaTime
+                );
+            }
+        }
     }
 
     private void OnDrawGizmosSelected()
     {
         // Draw pickup range in editor
         Gizmos.color = Color.green;
-        Vector3 checkPosition = playerCamera != null && playerCamera.transform != null 
-            ? playerCamera.transform.position 
+        Vector3 checkPosition = playerCamera != null && playerCamera.transform != null
+            ? playerCamera.transform.position
             : transform.position;
         Gizmos.DrawWireSphere(checkPosition, pickupRange);
     }

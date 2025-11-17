@@ -1,8 +1,8 @@
 using UnityEngine;
-using System;
 
 /// <summary>
-/// Health system for enemies. Handles taking damage and death.
+/// Component that manages enemy health and damage taking.
+/// Attach this to enemy GameObjects to enable them to take damage from weapons.
 /// </summary>
 public class EnemyHealth : MonoBehaviour
 {
@@ -12,21 +12,7 @@ public class EnemyHealth : MonoBehaviour
 
     [Header("Death Settings")]
     [SerializeField] private bool destroyOnDeath = true;
-    [SerializeField] private float destroyDelay = 2f;
-
-    [Header("Events")]
-    [SerializeField] private bool enableDebugLogs = true;
-
-    /// <summary>
-    /// Event that is called when the enemy takes damage.
-    /// Parameters: damage amount, current health, max health
-    /// </summary>
-    public event Action<float, float, float> OnDamageTaken;
-
-    /// <summary>
-    /// Event that is called when the enemy dies.
-    /// </summary>
-    public event Action OnDeath;
+    [SerializeField] private float deathDelay = 0f;
 
     /// <summary>
     /// The current health of the enemy.
@@ -44,13 +30,18 @@ public class EnemyHealth : MonoBehaviour
     public bool IsAlive => currentHealth > 0f;
 
     /// <summary>
-    /// The health percentage (0-1).
+    /// Event that is called when the enemy takes damage.
     /// </summary>
-    public float HealthPercentage => maxHealth > 0 ? currentHealth / maxHealth : 0f;
+    public System.Action<float> OnDamageTaken;
+
+    /// <summary>
+    /// Event that is called when the enemy dies.
+    /// </summary>
+    public System.Action OnDeath;
 
     private void Awake()
     {
-        // Initialize health to max if not set
+        // Initialize health to max if not already set
         if (currentHealth <= 0f)
         {
             currentHealth = maxHealth;
@@ -58,29 +49,22 @@ public class EnemyHealth : MonoBehaviour
     }
 
     /// <summary>
-    /// Makes the enemy take damage.
+    /// Makes the enemy take damage. Returns true if the enemy died from this damage.
     /// </summary>
     /// <param name="damage">The amount of damage to take.</param>
-    /// <returns>True if the enemy died from this damage, false otherwise.</returns>
+    /// <returns>True if the enemy died, false otherwise.</returns>
     public bool TakeDamage(float damage)
     {
         if (!IsAlive)
             return false;
 
-        if (damage <= 0f)
-            return false;
-
         // Apply damage
-        currentHealth -= damage;
-        currentHealth = Mathf.Max(0f, currentHealth); // Clamp to 0
+        currentHealth = Mathf.Max(0f, currentHealth - damage);
 
-        if (enableDebugLogs)
-        {
-            Debug.Log($"{gameObject.name} took {damage} damage. Health: {currentHealth}/{maxHealth}");
-        }
+        // Notify listeners
+        OnDamageTaken?.Invoke(damage);
 
-        // Invoke damage event
-        OnDamageTaken?.Invoke(damage, currentHealth, maxHealth);
+        Debug.Log($"{gameObject.name} took {damage} damage. Health: {currentHealth}/{maxHealth}");
 
         // Check if enemy died
         if (currentHealth <= 0f)
@@ -101,42 +85,16 @@ public class EnemyHealth : MonoBehaviour
         if (!IsAlive)
             return;
 
-        if (healAmount <= 0f)
-            return;
-
-        currentHealth += healAmount;
-        currentHealth = Mathf.Min(maxHealth, currentHealth); // Clamp to max
-
-        if (enableDebugLogs)
-        {
-            Debug.Log($"{gameObject.name} healed for {healAmount}. Health: {currentHealth}/{maxHealth}");
-        }
+        currentHealth = Mathf.Min(maxHealth, currentHealth + healAmount);
+        Debug.Log($"{gameObject.name} healed for {healAmount}. Health: {currentHealth}/{maxHealth}");
     }
 
     /// <summary>
-    /// Sets the enemy's health to a specific value.
+    /// Sets the enemy's health to the maximum value.
     /// </summary>
-    /// <param name="health">The health value to set.</param>
-    public void SetHealth(float health)
+    public void ResetHealth()
     {
-        currentHealth = Mathf.Clamp(health, 0f, maxHealth);
-    }
-
-    /// <summary>
-    /// Sets the maximum health and optionally adjusts current health proportionally.
-    /// </summary>
-    /// <param name="newMaxHealth">The new maximum health.</param>
-    /// <param name="adjustCurrentHealth">If true, adjusts current health proportionally.</param>
-    public void SetMaxHealth(float newMaxHealth, bool adjustCurrentHealth = false)
-    {
-        if (adjustCurrentHealth && maxHealth > 0f)
-        {
-            float healthPercentage = currentHealth / maxHealth;
-            currentHealth = newMaxHealth * healthPercentage;
-        }
-
-        maxHealth = Mathf.Max(1f, newMaxHealth);
-        currentHealth = Mathf.Min(currentHealth, maxHealth);
+        currentHealth = maxHealth;
     }
 
     /// <summary>
@@ -152,52 +110,38 @@ public class EnemyHealth : MonoBehaviour
     }
 
     /// <summary>
-    /// Handles the enemy's death.
+    /// Handles enemy death.
     /// </summary>
     private void Die()
     {
-        if (!IsAlive)
-            return;
+        Debug.Log($"{gameObject.name} died!");
 
-        if (enableDebugLogs)
-        {
-            Debug.Log($"{gameObject.name} has died!");
-        }
-
-        // Invoke death event
+        // Notify listeners
         OnDeath?.Invoke();
-
-        // Disable movement if it exists
-        EnemyMovement movement = GetComponent<EnemyMovement>();
-        if (movement != null)
-        {
-            movement.enabled = false;
-        }
 
         // Destroy or disable the enemy
         if (destroyOnDeath)
         {
-            Destroy(gameObject, destroyDelay);
+            if (deathDelay > 0f)
+            {
+                Destroy(gameObject, deathDelay);
+            }
+            else
+            {
+                Destroy(gameObject);
+            }
         }
         else
         {
+            // Just disable the GameObject instead of destroying it
             gameObject.SetActive(false);
         }
     }
 
-    /// <summary>
-    /// Resets the enemy's health to maximum.
-    /// </summary>
-    public void ResetHealth()
-    {
-        currentHealth = maxHealth;
-    }
-
     private void OnValidate()
     {
-        // Ensure health values are valid in the editor
+        // Ensure health values are valid
         maxHealth = Mathf.Max(1f, maxHealth);
         currentHealth = Mathf.Clamp(currentHealth, 0f, maxHealth);
     }
 }
-

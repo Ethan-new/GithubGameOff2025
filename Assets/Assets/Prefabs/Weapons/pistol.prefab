@@ -165,7 +165,7 @@ MonoBehaviour:
   rotationOffset: {x: 0, y: -90, z: 90}
   firePoint: {fileID: 3735651932675324473}
   fireSound: {fileID: 8300000, guid: e2cfc4baeb6f0124b9e6fe5bd955fd7e, type: 3}
-  fireSoundVolume: 0.5
+  fireSoundVolume: 0.3
   recoilPosition: {x: 0, y: 0, z: -0.1}
   recoilRotation: {x: -5, y: 0, z: 0}
   recoilDuration: 0.05
