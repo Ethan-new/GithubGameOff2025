@@ -550,6 +550,13 @@ public class PlayerController : MonoBehaviour
             }
             reloadPressed = false; // Reset reload input
         }
+
+        // Cancel reload if player starts sprinting
+        Weapon weapon = GetCurrentWeapon();
+        if (weapon != null && weapon.IsReloading && isSprinting)
+        {
+            weapon.CancelReload();
+        }
     }
 
     /// <summary>
@@ -1197,12 +1204,18 @@ public class PlayerController : MonoBehaviour
             walkAnimationTime = 0f;
         }
 
+        // Check if weapon is reloading - reload animation takes priority over walk/sprint animations
+        bool isReloading = currentWeapon.IsReloading;
+        
         // Disable recoil transform updates when we're controlling the transform with walk/sprint animations
-        bool isControllingTransform = sprintAnimationIntensity > 0.01f || walkAnimationIntensity > 0.01f;
+        // BUT allow reload animation to take priority - if reloading, don't control the transform
+        bool isControllingTransform = (sprintAnimationIntensity > 0.01f || walkAnimationIntensity > 0.01f) && !isReloading;
         currentWeapon.SetAllowRecoilTransformUpdate(!isControllingTransform);
 
+        // Don't apply walk/sprint animations if weapon is reloading (reload animation takes priority)
+        
         // Apply combined animation offset
-        if (sprintAnimationIntensity > 0.01f)
+        if (sprintAnimationIntensity > 0.01f && !isReloading)
         {
             // Sprint animation (includes position across chest)
             currentWeapon.transform.localPosition = basePosition + totalAnimationOffset;
@@ -1212,7 +1225,7 @@ public class PlayerController : MonoBehaviour
             float rotationSway = Mathf.Sin(sprintAnimationTime * 0.5f) * 3f * sprintAnimationIntensity;
             currentWeapon.transform.localRotation = targetSprintRotation * Quaternion.Euler(0f, rotationSway, 0f);
         }
-        else if (walkAnimationIntensity > 0.01f)
+        else if (walkAnimationIntensity > 0.01f && !isReloading)
         {
             // Walk animation (additive to recoil)
             // Calculate the position with both recoil and walk animation
@@ -1227,7 +1240,7 @@ public class PlayerController : MonoBehaviour
             currentWeapon.transform.localPosition = finalPosition;
             currentWeapon.transform.localRotation = finalRotation;
         }
-        else
+        else if (!isReloading)
         {
             // When not moving, smoothly return to base position if no active recoil
             // If there's active recoil, let the recoil system handle it
@@ -1246,6 +1259,7 @@ public class PlayerController : MonoBehaviour
                 );
             }
         }
+        // If reloading, the reload animation in Weapon.cs will handle the transform updates
     }
 
     private void OnDrawGizmosSelected()

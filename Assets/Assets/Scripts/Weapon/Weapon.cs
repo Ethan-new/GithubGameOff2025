@@ -49,6 +49,11 @@ public class Weapon : MonoBehaviour
     [SerializeField] protected AudioClip reloadSound; // Sound played when reloading
     [SerializeField] protected float reloadSoundVolume = 1f; // Volume of the reload sound (0-1)
 
+    [Header("Reload Animation Settings")]
+    [SerializeField] protected float reloadTiltAngle = 45f; // How much the weapon tilts down during reload (in degrees)
+    [SerializeField] protected Vector3 reloadTiltAxis = new Vector3(-1f, 0f, 0f); // Axis to tilt on (normalized direction). Default: negative X for downward tilt
+    [SerializeField] protected AnimationCurve reloadTiltCurve; // Animation curve for reload tilt (0-1 over reload duration)
+
     protected float lastAttackTime = 0f;
     protected bool isEquipped = false;
     protected Camera playerCamera;
@@ -493,8 +498,51 @@ public class Weapon : MonoBehaviour
             audioSource.PlayOneShot(reloadSound, reloadSoundVolume);
         }
 
-        // Wait for reload time
-        yield return new WaitForSeconds(reloadTime);
+        // Use the base local rotation (which includes weapon offsets) for reload animation
+        // This ensures consistency with how recoil and other animations work
+        Quaternion baseRotation = baseLocalRotation;
+        // Normalize the tilt axis and apply the angle
+        Vector3 normalizedAxis = reloadTiltAxis.normalized;
+        Vector3 reloadTiltRotation = normalizedAxis * reloadTiltAngle;
+
+        // Initialize reload tilt curve if not set
+        if (reloadTiltCurve == null || reloadTiltCurve.length == 0)
+        {
+            // Create smooth ease-in-out curve
+            reloadTiltCurve = new AnimationCurve(
+                new Keyframe(0f, 0f, 0f, 0f),  // Start at 0
+                new Keyframe(0.3f, 1f, 0f, 0f), // Quickly tilt down
+                new Keyframe(0.7f, 1f, 0f, 0f), // Hold tilted
+                new Keyframe(1f, 0f, 0f, 0f)    // Return to base
+            );
+        }
+
+        // Animate reload tilt
+        float elapsedTime = 0f;
+        while (elapsedTime < reloadTime)
+        {
+            elapsedTime += Time.deltaTime;
+            float normalizedTime = Mathf.Clamp01(elapsedTime / reloadTime);
+            float curveValue = reloadTiltCurve.Evaluate(normalizedTime);
+
+            // Apply tilt rotation based on curve, relative to base rotation (which includes offsets)
+            Vector3 currentTilt = reloadTiltRotation * curveValue;
+            Quaternion targetRotation = baseRotation * Quaternion.Euler(currentTilt);
+            
+            // Only update transform if we're allowed to (not when external animations are controlling it)
+            if (allowRecoilTransformUpdate)
+            {
+                transform.localRotation = targetRotation;
+            }
+
+            yield return null;
+        }
+
+        // Ensure we're back at base rotation (which includes offsets)
+        if (allowRecoilTransformUpdate)
+        {
+            transform.localRotation = baseRotation;
+        }
 
         // Refill magazine
         currentAmmo = magazineSize;
@@ -515,6 +563,12 @@ public class Weapon : MonoBehaviour
             reloadCoroutine = null;
         }
         isReloading = false;
+        
+        // Restore base rotation (which includes offsets) if we're controlling the transform
+        if (allowRecoilTransformUpdate)
+        {
+            transform.localRotation = baseLocalRotation;
+        }
     }
 
     protected virtual void Awake()
