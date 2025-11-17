@@ -116,6 +116,12 @@ public class EnemyHealth : MonoBehaviour
     {
         Debug.Log($"{gameObject.name} died!");
 
+        // Award score for kill
+        if (ScoreManager.Instance != null)
+        {
+            ScoreManager.Instance.AddKillScore();
+        }
+
         // Notify listeners
         OnDeath?.Invoke();
 

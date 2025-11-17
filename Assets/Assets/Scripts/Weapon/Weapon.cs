@@ -199,6 +199,19 @@ public class Weapon : MonoBehaviour
             if (enemyHealth != null)
             {
                 enemyHealth.TakeDamage(finalDamage);
+                
+                // Award score for hit (crits give more points)
+                if (ScoreManager.Instance != null)
+                {
+                    if (isCrit)
+                    {
+                        ScoreManager.Instance.AddCritScore();
+                    }
+                    else
+                    {
+                        ScoreManager.Instance.AddHitScore();
+                    }
+                }
             }
         }
         else
