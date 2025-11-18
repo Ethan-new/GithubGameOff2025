@@ -354,8 +354,17 @@ public class PlayerHealth : MonoBehaviour
         // Handle respawn
         if (respawnOnDeath)
         {
-            Invoke(nameof(Respawn), respawnDelay);
+            StartCoroutine(RespawnCoroutine());
         }
+    }
+
+    /// <summary>
+    /// Coroutine that handles respawn with delay.
+    /// </summary>
+    private System.Collections.IEnumerator RespawnCoroutine()
+    {
+        yield return new WaitForSeconds(respawnDelay);
+        Respawn();
     }
 
     /// <summary>

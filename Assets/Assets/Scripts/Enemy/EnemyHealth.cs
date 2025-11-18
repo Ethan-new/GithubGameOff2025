@@ -142,8 +142,12 @@ public class EnemyHealth : MonoBehaviour
             ScoreManager.Instance.AddKillScore();
         }
 
-        // Notify listeners
+        // Notify listeners (invoke before cleanup to ensure all subscribers are notified)
         OnDeath?.Invoke();
+        
+        // Clear event subscriptions to prevent memory leaks
+        OnDeath = null;
+        OnDamageTaken = null;
 
         // Destroy or disable the enemy
         if (destroyOnDeath)

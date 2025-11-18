@@ -124,28 +124,31 @@ public class AmmoUI : MonoBehaviour
     private void Update()
     {
         // Re-find PlayerController if lost (e.g., after scene reload)
+        // Use cooldown to avoid expensive Find calls every frame
         if (playerController == null)
         {
-            playerController = FindFirstObjectByType<PlayerController>();
-            if (playerController == null)
-                return;
+            // Only search once per second if reference is lost
+            if (Time.frameCount % 60 == 0) // Check every 60 frames (~1 second at 60fps)
+            {
+                playerController = FindFirstObjectByType<PlayerController>();
+                if (playerController == null)
+                    return;
+            }
+            else
+            {
+                return; // Skip update if we don't have a controller reference
+            }
         }
 
-        // Re-find PlayerInventory if lost
-        if (playerInventory == null)
+        // Re-find PlayerInventory if lost (only if we have a controller)
+        if (playerInventory == null && playerController != null)
         {
-            if (playerController != null)
-            {
-                playerInventory = playerController.GetComponent<PlayerInventory>();
-                if (playerInventory == null)
-                {
-                    playerInventory = playerController.GetComponentInChildren<PlayerInventory>();
-                }
-            }
+            playerInventory = playerController.GetComponent<PlayerInventory>();
             if (playerInventory == null)
             {
-                playerInventory = FindFirstObjectByType<PlayerInventory>();
+                playerInventory = playerController.GetComponentInChildren<PlayerInventory>();
             }
+            // Don't use FindFirstObjectByType here - if it's not on the controller, skip
         }
 
         // Update ammo display if weapon or ammo has changed

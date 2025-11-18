@@ -37,6 +37,7 @@ public class WaveManager : MonoBehaviour
     private bool isWaveActive = false;
     private bool isSpawning = false;
     private List<GameObject> activeEnemies = new List<GameObject>();
+    private Dictionary<GameObject, System.Action> enemyDeathHandlers = new Dictionary<GameObject, System.Action>();
 
     /// <summary>
     /// The current wave number.
@@ -221,7 +222,10 @@ public class WaveManager : MonoBehaviour
         EnemyHealth enemyHealth = enemy.GetComponent<EnemyHealth>();
         if (enemyHealth != null)
         {
-            enemyHealth.OnDeath += () => OnEnemyDeath(enemy);
+            // Store handler reference for proper cleanup
+            System.Action deathHandler = () => OnEnemyDeath(enemy);
+            enemyHealth.OnDeath += deathHandler;
+            enemyDeathHandlers[enemy] = deathHandler;
         }
 
         OnEnemySpawned?.Invoke(enemy);
@@ -268,6 +272,18 @@ public class WaveManager : MonoBehaviour
 
         activeEnemies.Remove(enemy);
         enemiesAlive--;
+
+        // Unsubscribe from enemy death event to prevent memory leaks
+        if (enemy != null && enemyDeathHandlers.ContainsKey(enemy))
+        {
+            EnemyHealth enemyHealth = enemy.GetComponent<EnemyHealth>();
+            if (enemyHealth != null)
+            {
+                System.Action handler = enemyDeathHandlers[enemy];
+                enemyHealth.OnDeath -= handler;
+            }
+            enemyDeathHandlers.Remove(enemy);
+        }
 
         OnEnemyDied?.Invoke(enemy);
 
@@ -346,6 +362,20 @@ public class WaveManager : MonoBehaviour
         isWaveActive = false;
         isSpawning = false;
         currentWave = startingWave - 1;
+        
+        // Clean up all event subscriptions
+        foreach (var kvp in enemyDeathHandlers)
+        {
+            if (kvp.Key != null)
+            {
+                EnemyHealth enemyHealth = kvp.Key.GetComponent<EnemyHealth>();
+                if (enemyHealth != null)
+                {
+                    enemyHealth.OnDeath -= kvp.Value;
+                }
+            }
+        }
+        enemyDeathHandlers.Clear();
 
         StopAllCoroutines();
     }

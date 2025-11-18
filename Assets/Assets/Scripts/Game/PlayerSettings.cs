@@ -50,7 +50,9 @@ public class PlayerSettings : MonoBehaviour
     public void SetMouseSensitivity(float sensitivity)
     {
         PlayerPrefs.SetFloat(KEY_MOUSE_SENSITIVITY, sensitivity);
-        PlayerPrefs.Save(); // Save immediately
+        hasUnsavedChanges = true;
+        // Don't save immediately - let OnDestroy/OnApplicationPause handle it
+        // This reduces I/O operations
     }
 
     /// <summary>
@@ -77,6 +79,7 @@ public class PlayerSettings : MonoBehaviour
     public void SaveSettings()
     {
         PlayerPrefs.Save();
+        hasUnsavedChanges = false;
         #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log("Player settings saved");
         #endif
@@ -98,28 +101,36 @@ public class PlayerSettings : MonoBehaviour
         #endif
     }
 
+    private bool hasUnsavedChanges = false;
+
     private void OnApplicationPause(bool pauseStatus)
     {
         // Save settings when application is paused (e.g., mobile)
-        if (pauseStatus)
+        if (pauseStatus && hasUnsavedChanges)
         {
             SaveSettings();
+            hasUnsavedChanges = false;
         }
     }
 
     private void OnApplicationFocus(bool hasFocus)
     {
         // Save settings when application loses focus
-        if (!hasFocus)
+        if (!hasFocus && hasUnsavedChanges)
         {
             SaveSettings();
+            hasUnsavedChanges = false;
         }
     }
 
     private void OnDestroy()
     {
-        // Save settings when destroyed
-        SaveSettings();
+        // Save settings when destroyed (only if there are unsaved changes)
+        if (hasUnsavedChanges)
+        {
+            SaveSettings();
+            hasUnsavedChanges = false;
+        }
     }
 }
 

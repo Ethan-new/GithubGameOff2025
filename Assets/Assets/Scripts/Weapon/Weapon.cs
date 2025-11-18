@@ -301,15 +301,16 @@ public class Weapon : MonoBehaviour
                 enemyHealth.TakeDamage(finalDamage);
                 
                 // Award score for hit (crits give more points)
-                if (ScoreManager.Instance != null)
+                ScoreManager scoreManager = ScoreManager.Instance;
+                if (scoreManager != null)
                 {
                     if (isCrit)
                     {
-                        ScoreManager.Instance.AddCritScore();
+                        scoreManager.AddCritScore();
                     }
                     else
                     {
-                        ScoreManager.Instance.AddHitScore();
+                        scoreManager.AddHitScore();
                     }
                 }
             }
