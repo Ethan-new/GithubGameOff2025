@@ -143,7 +143,7 @@ public class Weapon : MonoBehaviour
             }
         }
         
-        // Initialize ammo if not already set, or auto-load if starting with ammo (e.g., 120 bullets)
+        // Initialize ammo if not already set (only load if magazine is empty)
         if (currentAmmo == 0 && magazineSize > 0)
         {
             // Try to reload from inventory if available
@@ -164,22 +164,6 @@ public class Weapon : MonoBehaviour
             {
                 // Fallback: fill magazine if no inventory system
                 currentAmmo = magazineSize;
-            }
-        }
-        // Auto-load gun if starting with ammo (e.g., 120 bullets) - ensure magazine is full
-        else if (currentAmmo < magazineSize && magazineSize > 0)
-        {
-            // Try to reload from inventory if available
-            if (playerInventory != null && ammoType != null)
-            {
-                int ammoNeeded = magazineSize - currentAmmo;
-                int ammoAvailable = playerInventory.GetAmmoCount(ammoType);
-                int ammoToLoad = Mathf.Min(ammoNeeded, ammoAvailable);
-                if (ammoToLoad > 0)
-                {
-                    playerInventory.RemoveAmmo(ammoType, ammoToLoad);
-                    currentAmmo += ammoToLoad;
-                }
             }
         }
     }
