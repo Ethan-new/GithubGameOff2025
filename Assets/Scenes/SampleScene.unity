@@ -543,6 +543,17 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &799111164 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6591188558156533447, guid: ddd43f993942d484ea3a962671089d25, type: 3}
+  m_PrefabInstance: {fileID: 1440444604929035263}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 25b3f0858a24f4d65a7138485e1548c0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerInventory
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -2370,19 +2381,27 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6591188558156533447, guid: ddd43f993942d484ea3a962671089d25, type: 3}
       propertyPath: startingAmmoTypes.Array.size
-      value: 1
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 6591188558156533447, guid: ddd43f993942d484ea3a962671089d25, type: 3}
       propertyPath: startingAmmoAmounts.Array.size
-      value: 1
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 6591188558156533447, guid: ddd43f993942d484ea3a962671089d25, type: 3}
       propertyPath: 'startingAmmoTypes.Array.data[0]'
       value: 
       objectReference: {fileID: 11400000, guid: 40521a91982814b0398d906fe5cc8500, type: 2}
     - target: {fileID: 6591188558156533447, guid: ddd43f993942d484ea3a962671089d25, type: 3}
+      propertyPath: 'startingAmmoTypes.Array.data[1]'
+      value: 
+      objectReference: {fileID: 11400000, guid: f2006afa07edc4a22bb00e9a4c4e3d3c, type: 2}
+    - target: {fileID: 6591188558156533447, guid: ddd43f993942d484ea3a962671089d25, type: 3}
       propertyPath: 'startingAmmoAmounts.Array.data[0]'
       value: 120
+      objectReference: {fileID: 0}
+    - target: {fileID: 6591188558156533447, guid: ddd43f993942d484ea3a962671089d25, type: 3}
+      propertyPath: 'startingAmmoAmounts.Array.data[1]'
+      value: 100
       objectReference: {fileID: 0}
     - target: {fileID: 7321075382374572986, guid: ddd43f993942d484ea3a962671089d25, type: 3}
       propertyPath: m_LocalPosition.x
@@ -2424,6 +2443,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7836857798839533072, guid: ddd43f993942d484ea3a962671089d25, type: 3}
+      propertyPath: playerInventory
+      value: 
+      objectReference: {fileID: 799111164}
+    - target: {fileID: 7836857798839533072, guid: ddd43f993942d484ea3a962671089d25, type: 3}
+      propertyPath: 'startingWeapons.Array.data[1]'
+      value: 
+      objectReference: {fileID: -1397237719254186417, guid: da5619d8c991f4391829d895972e3e3b, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
