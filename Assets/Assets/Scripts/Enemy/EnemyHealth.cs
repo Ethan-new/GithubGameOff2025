@@ -102,6 +102,20 @@ public class EnemyHealth : MonoBehaviour
     }
 
     /// <summary>
+    /// Scales the maximum health by a multiplier. Useful for wave-based difficulty scaling.
+    /// </summary>
+    /// <param name="multiplier">The multiplier to apply to max health.</param>
+    public void ScaleMaxHealth(float multiplier)
+    {
+        if (multiplier <= 0f)
+            return;
+
+        float healthRatio = currentHealth / maxHealth; // Preserve current health percentage
+        maxHealth *= multiplier;
+        currentHealth = maxHealth * healthRatio; // Maintain the same health percentage
+    }
+
+    /// <summary>
     /// Kills the enemy immediately.
     /// </summary>
     public void Kill()

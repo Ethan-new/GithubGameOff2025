@@ -155,6 +155,35 @@ public class EnemyMovement : MonoBehaviour
         target = null;
     }
 
+    /// <summary>
+    /// Gets the current move speed.
+    /// </summary>
+    public float GetMoveSpeed()
+    {
+        return moveSpeed;
+    }
+
+    /// <summary>
+    /// Sets the move speed. Useful for wave-based difficulty scaling.
+    /// </summary>
+    /// <param name="newSpeed">The new move speed value.</param>
+    public void SetMoveSpeed(float newSpeed)
+    {
+        moveSpeed = Mathf.Max(0f, newSpeed);
+    }
+
+    /// <summary>
+    /// Scales the move speed by a multiplier. Useful for wave-based difficulty scaling.
+    /// </summary>
+    /// <param name="multiplier">The multiplier to apply to move speed.</param>
+    public void ScaleMoveSpeed(float multiplier)
+    {
+        if (multiplier <= 0f)
+            return;
+
+        moveSpeed *= multiplier;
+    }
+
     private void OnDrawGizmosSelected()
     {
         // Draw stopping distance
