@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
@@ -439,6 +440,7 @@ public class PlayerController : MonoBehaviour
         HandleAttack();
         HandleInteract();
         HandleReload();
+        HandleWeaponSelection();
     }
 
     private void HandleMouseLook()
@@ -548,6 +550,13 @@ public class PlayerController : MonoBehaviour
 
         if (shouldAttack)
         {
+            // Check if player is swapping weapons - prevent shooting while swapping
+            if (isSwappingWeapon)
+            {
+                // Shooting is blocked while swapping weapons
+                return;
+            }
+
             // Check if player is sprinting - prevent shooting while sprinting
             if (isSprinting)
             {
@@ -569,6 +578,50 @@ public class PlayerController : MonoBehaviour
 #endif
             TryPickupWeapon();
             interactPressed = false; // Reset interact input
+        }
+    }
+
+    private void HandleWeaponSelection()
+    {
+        // Don't allow weapon selection during swap animation
+        if (isSwappingWeapon)
+            return;
+
+        // Check for number keys 1-9 using Input System
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard == null)
+            return;
+
+        // Check for number keys 1-9
+        for (int i = 1; i <= 9; i++)
+        {
+            // Get the corresponding number key (Alpha1, Alpha2, etc.)
+            KeyControl key = null;
+            switch (i)
+            {
+                case 1: key = keyboard.digit1Key; break;
+                case 2: key = keyboard.digit2Key; break;
+                case 3: key = keyboard.digit3Key; break;
+                case 4: key = keyboard.digit4Key; break;
+                case 5: key = keyboard.digit5Key; break;
+                case 6: key = keyboard.digit6Key; break;
+                case 7: key = keyboard.digit7Key; break;
+                case 8: key = keyboard.digit8Key; break;
+                case 9: key = keyboard.digit9Key; break;
+            }
+
+            if (key != null && key.wasPressedThisFrame)
+            {
+                // Convert to slot index (1-based to 0-based)
+                int slotIndex = i - 1;
+                
+                // Check if slot is valid and has a weapon
+                if (slotIndex >= 0 && slotIndex < weaponInventory.Length && weaponInventory[slotIndex] != null)
+                {
+                    SwitchWeapon(slotIndex);
+                }
+                break; // Only process one key press per frame
+            }
         }
     }
 
@@ -907,6 +960,16 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
+    /// Switches to the weapon at the specified slot (0-indexed). Pressing 1 switches to slot 0, pressing 2 switches to slot 1, etc.
+    /// </summary>
+    public void SwitchToWeaponSlot(int slot)
+    {
+        // Convert from 1-based (user input) to 0-based (array index)
+        int index = slot - 1;
+        SwitchWeapon(index);
+    }
+
+    /// <summary>
     /// Switches to the weapon at the specified index with animation.
     /// </summary>
     private void SwitchWeapon(int index)
@@ -942,20 +1005,30 @@ public class PlayerController : MonoBehaviour
         Weapon currentWeapon = null;
         Weapon newWeapon = weaponInventory[newWeaponIndex];
 
-        // Get current weapon if one is equipped
+        // Get current weapon if one is equipped (store reference before updating index)
         if (currentWeaponIndex >= 0 && currentWeaponIndex < weaponInventory.Length)
         {
             currentWeapon = weaponInventory[currentWeaponIndex];
         }
 
-        // Ensure new weapon is parented and active (but hidden initially)
+        // Update currentWeaponIndex immediately so UI updates right away
+        // We still have the old weapon reference stored in currentWeapon for the animation
+        currentWeaponIndex = newWeaponIndex;
+
+        // Ensure new weapon is parented and equipped early so ammo loads for UI
         if (newWeapon != null)
         {
             if (newWeapon.transform.parent != weaponHolder)
             {
                 newWeapon.transform.SetParent(weaponHolder);
             }
-            newWeapon.gameObject.SetActive(true);
+            
+            // Call OnEquip() early to load ammo so UI shows correct info immediately
+            // We'll handle position/active state manually for the animation
+            newWeapon.OnEquip();
+            
+            // Keep new weapon inactive until it's time to show it (animation will handle position)
+            newWeapon.gameObject.SetActive(false);
 
             // Get target position/rotation for new weapon
             Vector3 targetPosition = newWeapon.GetPositionOffset();
@@ -977,49 +1050,75 @@ public class PlayerController : MonoBehaviour
             hasCurrentWeapon = true;
         }
 
-        // Animate the swap
-        float elapsedTime = 0f;
-        while (elapsedTime < swapAnimationDuration)
+        // Phase 1: Animate current weapon out (if exists)
+        if (hasCurrentWeapon && currentWeapon != null && currentWeapon.gameObject.activeSelf)
         {
-            elapsedTime += Time.deltaTime;
-            float normalizedTime = Mathf.Clamp01(elapsedTime / swapAnimationDuration);
-            float curveValue = swapAnimationCurve.Evaluate(normalizedTime);
-
-            // Animate current weapon out (if exists)
-            if (hasCurrentWeapon && currentWeapon != null && currentWeapon.gameObject.activeSelf)
+            float elapsedTime = 0f;
+            Vector3 hidePosition = currentWeaponStartPos + swapHideOffset;
+            
+            while (elapsedTime < swapAnimationDuration)
             {
-                Vector3 hidePosition = currentWeaponStartPos + swapHideOffset;
+                elapsedTime += Time.deltaTime;
+                float normalizedTime = Mathf.Clamp01(elapsedTime / swapAnimationDuration);
+                float curveValue = swapAnimationCurve.Evaluate(normalizedTime);
+
                 currentWeapon.transform.localPosition = Vector3.Lerp(currentWeaponStartPos, hidePosition, curveValue);
                 currentWeapon.transform.localRotation = Quaternion.Lerp(currentWeaponStartRot, Quaternion.identity, curveValue);
-            }
 
-            // Animate new weapon in
-            if (newWeapon != null)
+                yield return null;
+            }
+            
+            // Deactivate and finalize old weapon after it's fully put away
+            if (currentWeapon != null)
             {
-                Vector3 targetPosition = newWeapon.GetPositionOffset();
-                Quaternion targetRotation = Quaternion.Euler(newWeapon.GetRotationOffset());
-                Vector3 startPosition = targetPosition + swapShowOffset;
+                currentWeapon.StopRecoil();
+                currentWeapon.OnUnequip();
+                currentWeapon.gameObject.SetActive(false);
+            }
+        }
+
+        // Phase 2: Animate new weapon in (only after old weapon is put away)
+        if (newWeapon != null)
+        {
+            // Activate new weapon now that old one is put away
+            newWeapon.gameObject.SetActive(true);
+            
+            Vector3 targetPosition = newWeapon.GetPositionOffset();
+            Quaternion targetRotation = Quaternion.Euler(newWeapon.GetRotationOffset());
+            Vector3 startPosition = targetPosition + swapShowOffset;
+            
+            // Set initial position
+            newWeapon.transform.localPosition = startPosition;
+            newWeapon.transform.localRotation = Quaternion.Euler(newWeapon.GetRotationOffset());
+
+            float elapsedTime = 0f;
+            while (elapsedTime < swapAnimationDuration)
+            {
+                elapsedTime += Time.deltaTime;
+                float normalizedTime = Mathf.Clamp01(elapsedTime / swapAnimationDuration);
+                float curveValue = swapAnimationCurve.Evaluate(normalizedTime);
 
                 newWeapon.transform.localPosition = Vector3.Lerp(startPosition, targetPosition, curveValue);
                 newWeapon.transform.localRotation = Quaternion.Lerp(Quaternion.Euler(newWeapon.GetRotationOffset()), targetRotation, curveValue);
-            }
 
-            yield return null;
+                yield return null;
+            }
         }
 
         // Finalize the swap
-        // Stop recoil on old weapon and hide it
-        if (currentWeapon != null)
-        {
-            currentWeapon.StopRecoil();
-            currentWeapon.OnUnequip();
-        }
-
-        // Equip new weapon
-        currentWeaponIndex = newWeaponIndex;
+        // Weapon was already equipped at the start (for UI ammo display)
+        // Just ensure it's active and positioned correctly
         if (newWeapon != null)
         {
-            newWeapon.OnEquip();
+            // Ensure weapon is active (should already be from OnEquip, but make sure)
+            newWeapon.gameObject.SetActive(true);
+            
+            // Apply final position/rotation (animation should have already set this, but ensure it's correct)
+            Vector3 finalPosition = newWeapon.GetPositionOffset();
+            Quaternion finalRotation = Quaternion.Euler(newWeapon.GetRotationOffset());
+            newWeapon.transform.localPosition = finalPosition;
+            newWeapon.transform.localRotation = finalRotation;
+            
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"Switched to {newWeapon.WeaponName}");
 #endif
@@ -1226,6 +1325,12 @@ public class PlayerController : MonoBehaviour
     /// </summary>
     private void HandleSprintAnimation()
     {
+        // Don't apply walk/sprint animations during weapon swap - swap animation takes priority
+        if (isSwappingWeapon)
+        {
+            return;
+        }
+
         Weapon currentWeapon = GetCurrentWeapon();
         if (currentWeapon == null || !currentWeapon.IsEquipped)
         {
