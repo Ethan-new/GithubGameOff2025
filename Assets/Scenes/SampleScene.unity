@@ -676,6 +676,145 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &500591888
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 500591893}
+  - component: {fileID: 500591892}
+  - component: {fileID: 500591891}
+  - component: {fileID: 500591890}
+  - component: {fileID: 500591889}
+  m_Layer: 0
+  m_Name: Cube
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &500591889
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 500591888}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4693778e148a43388f008c621792af0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AmmoBox
+  ammoType: {fileID: 11400000, guid: 40521a91982814b0398d906fe5cc8500, type: 2}
+  ammoAmount: 250
+  setToAmount: 1
+  pickupRadius: 2
+  useTrigger: 1
+  destroyOnPickup: 1
+  respawnTime: 0
+  canRotate: 1
+  rotationSpeed: 45
+  canBob: 1
+  bobSpeed: 1
+  bobAmount: 0.1
+  pickupSound: {fileID: 0}
+  pickupSoundVolume: 1
+  pickupEffect: {fileID: 0}
+--- !u!65 &500591890
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 500591888}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!23 &500591891
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 500591888}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &500591892
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 500591888}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!4 &500591893
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 500591888}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.5, y: 0.59, z: -3.99}
+  m_LocalScale: {x: 0.3, y: 0.3, z: 0.3}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &686288968
 GameObject:
   m_ObjectHideFlags: 0
@@ -721,6 +860,8 @@ GameObject:
   - component: {fileID: 799111160}
   - component: {fileID: 799111159}
   - component: {fileID: 799111158}
+  - component: {fileID: 799111164}
+  - component: {fileID: 799111165}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -749,6 +890,7 @@ MonoBehaviour:
   playerCamera: {fileID: 927760732}
   inputActionsAsset: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   weaponHolder: {fileID: 686288969}
+  playerInventory: {fileID: 0}
   maxWeapons: 2
   startingWeapons:
   - {fileID: 2313148093950078771, guid: 186846c2dc621fa43ae6973300b0801c, type: 3}
@@ -794,6 +936,11 @@ MonoBehaviour:
   walkBobAmount: 0.03
   walkSwayAmount: 0.02
   walkAnimationTransitionSpeed: 5
+  swayAmount: 0.1
+  swaySmoothness: 10
+  swayReturnSpeed: 5
+  maxSwayAngle: 15
+  maxSwayPosition: 0.05
 --- !u!143 &799111159
 CharacterController:
   m_ObjectHideFlags: 0
@@ -915,6 +1062,56 @@ Transform:
   - {fileID: 686288969}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &799111164
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 799111157}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 25b3f0858a24f4d65a7138485e1548c0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerInventory
+  startingAmmoTypes: []
+  startingAmmoAmounts: 
+  startingPlayerAugments: []
+  startingWeaponAugments: []
+  maxAmmoPerType: 999
+  maxPlayerAugments: 10
+  maxWeaponAugments: 10
+--- !u!114 &799111165
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 799111157}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6c480cd583d89412899cbf794629711e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
+  maxHealth: 100
+  currentHealth: 0
+  initializeOnStart: 1
+  enableRegeneration: 0
+  regenDelay: 5
+  regenRate: 5
+  regenAmount: 1
+  regenInterval: 0.2
+  respawnOnDeath: 1
+  respawnDelay: 3
+  respawnPoint: {fileID: 0}
+  resetHealthOnRespawn: 1
+  invincibleOnSpawn: 1
+  invincibilityDuration: 2
+  deathEffect: {fileID: 0}
+  damageSound: {fileID: 0}
+  deathSound: {fileID: 0}
+  damageSoundVolume: 1
+  deathSoundVolume: 1
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -1960,3 +2157,4 @@ SceneRoots:
   - {fileID: 2114925225}
   - {fileID: 925020340}
   - {fileID: 1976436835}
+  - {fileID: 500591893}
