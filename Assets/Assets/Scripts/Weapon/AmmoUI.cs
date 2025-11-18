@@ -24,9 +24,10 @@ public class AmmoUI : MonoBehaviour
 #endif
     
     private PlayerController playerController;
+    private PlayerInventory playerInventory;
     private Weapon currentWeapon;
     private int lastCurrentAmmo = -1;
-    private int lastMagazineSize = -1;
+    private int lastInventoryAmmo = -1;
 
     private void Awake()
     {
@@ -99,6 +100,23 @@ public class AmmoUI : MonoBehaviour
             }
         }
 
+        // Find PlayerInventory - cache reference to avoid expensive Find calls
+        if (playerInventory == null)
+        {
+            if (playerController != null)
+            {
+                playerInventory = playerController.GetComponent<PlayerInventory>();
+                if (playerInventory == null)
+                {
+                    playerInventory = playerController.GetComponentInChildren<PlayerInventory>();
+                }
+            }
+            if (playerInventory == null)
+            {
+                playerInventory = FindFirstObjectByType<PlayerInventory>();
+            }
+        }
+
         // Initialize display
         UpdateAmmoDisplay();
     }
@@ -113,6 +131,23 @@ public class AmmoUI : MonoBehaviour
                 return;
         }
 
+        // Re-find PlayerInventory if lost
+        if (playerInventory == null)
+        {
+            if (playerController != null)
+            {
+                playerInventory = playerController.GetComponent<PlayerInventory>();
+                if (playerInventory == null)
+                {
+                    playerInventory = playerController.GetComponentInChildren<PlayerInventory>();
+                }
+            }
+            if (playerInventory == null)
+            {
+                playerInventory = FindFirstObjectByType<PlayerInventory>();
+            }
+        }
+
         // Update ammo display if weapon or ammo has changed
         Weapon newWeapon = playerController.GetCurrentWeapon();
         
@@ -120,26 +155,34 @@ public class AmmoUI : MonoBehaviour
         if (newWeapon != currentWeapon)
         {
             currentWeapon = newWeapon;
+            lastCurrentAmmo = -1; // Reset to force update
+            lastInventoryAmmo = -1; // Reset to force update
             UpdateAmmoDisplay();
         }
         // Check if ammo changed
         else if (currentWeapon != null)
         {
             int currentAmmo = currentWeapon.CurrentAmmo;
-            int magazineSize = currentWeapon.MagazineSize;
+            int inventoryAmmo = 0;
             
-            if (currentAmmo != lastCurrentAmmo || magazineSize != lastMagazineSize)
+            // Get ammo count from inventory if available
+            if (playerInventory != null && currentWeapon.AmmoType != null)
+            {
+                inventoryAmmo = playerInventory.GetAmmoCount(currentWeapon.AmmoType);
+            }
+            
+            if (currentAmmo != lastCurrentAmmo || inventoryAmmo != lastInventoryAmmo)
             {
                 lastCurrentAmmo = currentAmmo;
-                lastMagazineSize = magazineSize;
+                lastInventoryAmmo = inventoryAmmo;
                 UpdateAmmoDisplay();
             }
         }
         // If no weapon, make sure display is updated
-        else if (currentWeapon == null && (lastCurrentAmmo != -1 || lastMagazineSize != -1))
+        else if (currentWeapon == null && (lastCurrentAmmo != -1 || lastInventoryAmmo != -1))
         {
             lastCurrentAmmo = -1;
-            lastMagazineSize = -1;
+            lastInventoryAmmo = -1;
             UpdateAmmoDisplay();
         }
     }
@@ -226,9 +269,17 @@ public class AmmoUI : MonoBehaviour
         if (currentWeapon != null && currentWeapon.IsEquipped)
         {
             int currentAmmo = currentWeapon.CurrentAmmo;
-            int magazineSize = currentWeapon.MagazineSize;
+            int inventoryAmmo = 0;
+            
+            // Get ammo count from inventory if available
+            if (playerInventory != null && currentWeapon.AmmoType != null)
+            {
+                inventoryAmmo = playerInventory.GetAmmoCount(currentWeapon.AmmoType);
+            }
+            
+            // Display format: ammoInClip / ammoInInventory
             // Use string.Format - it's optimized in Unity and handles format strings properly
-            ammoString = string.Format(ammoFormat, currentAmmo, magazineSize);
+            ammoString = string.Format(ammoFormat, currentAmmo, inventoryAmmo);
         }
         else
         {

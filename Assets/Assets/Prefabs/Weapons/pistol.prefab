@@ -187,6 +187,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   queryTriggerInteraction: 1
+  ammoType: {fileID: 11400000, guid: 40521a91982814b0398d906fe5cc8500, type: 2}
   magazineSize: 12
   reloadTime: 2
   reloadSound: {fileID: 0}
@@ -204,4 +205,3 @@ MonoBehaviour:
   reloadWalkBobAmount: 0.05
   reloadWalkSwayAmount: 0.02
   reloadWalkRotationSway: 1.5
-  reloadReturnDuration: 0.5

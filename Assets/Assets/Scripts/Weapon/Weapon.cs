@@ -44,6 +44,7 @@ public class Weapon : MonoBehaviour
     [SerializeField] protected QueryTriggerInteraction queryTriggerInteraction = QueryTriggerInteraction.Ignore;
 
     [Header("Ammo Settings")]
+    [SerializeField] protected AmmoType ammoType; // Type of ammo this weapon uses
     [SerializeField] protected int magazineSize = 30; // Maximum ammo in magazine (configurable in editor)
     [SerializeField] protected float reloadTime = 2f; // Time it takes to reload (in seconds)
     [SerializeField] protected AudioClip reloadSound; // Sound played when reloading
@@ -73,6 +74,7 @@ public class Weapon : MonoBehaviour
     private float currentRecoilAmount = 0f; // Current recoil stack (0 to maxRecoilStack)
     private AudioSource audioSource; // Audio source for playing sounds
     private bool allowRecoilTransformUpdate = true; // Whether recoil can directly update transform (false when external animations are controlling it)
+    private PlayerInventory playerInventory; // Reference to player inventory for ammo management
 
     /// <summary>
     /// The name of the weapon.
@@ -105,6 +107,11 @@ public class Weapon : MonoBehaviour
     public int MagazineSize => magazineSize;
 
     /// <summary>
+    /// The type of ammo this weapon uses.
+    /// </summary>
+    public AmmoType AmmoType => ammoType;
+
+    /// <summary>
     /// Whether the weapon is currently reloading.
     /// </summary>
     public bool IsReloading => isReloading;
@@ -122,10 +129,42 @@ public class Weapon : MonoBehaviour
         baseLocalPosition = positionOffset;
         baseLocalRotation = Quaternion.Euler(rotationOffset);
         
+        // Find PlayerInventory if not cached
+        if (playerInventory == null)
+        {
+            playerInventory = GetComponentInParent<PlayerInventory>();
+            if (playerInventory == null)
+            {
+                PlayerController playerController = GetComponentInParent<PlayerController>();
+                if (playerController != null)
+                {
+                    playerInventory = playerController.GetComponent<PlayerInventory>();
+                }
+            }
+        }
+        
         // Initialize ammo if not already set
         if (currentAmmo == 0 && magazineSize > 0)
         {
-            currentAmmo = magazineSize;
+            // Try to reload from inventory if available
+            if (playerInventory != null && ammoType != null)
+            {
+                int ammoToLoad = Mathf.Min(magazineSize, playerInventory.GetAmmoCount(ammoType));
+                if (ammoToLoad > 0)
+                {
+                    playerInventory.RemoveAmmo(ammoType, ammoToLoad);
+                    currentAmmo = ammoToLoad;
+                }
+                else
+                {
+                    currentAmmo = 0; // No ammo in inventory
+                }
+            }
+            else
+            {
+                // Fallback: fill magazine if no inventory system
+                currentAmmo = magazineSize;
+            }
         }
     }
 
@@ -195,7 +234,7 @@ public class Weapon : MonoBehaviour
 
         // Perform attack
         lastAttackTime = Time.time;
-        currentAmmo--; // Consume ammo
+        currentAmmo--; // Consume ammo from magazine
         PerformAttack();
         
         // Play fire sound
@@ -480,6 +519,37 @@ public class Weapon : MonoBehaviour
             return false;
         }
 
+        // Try to find PlayerInventory if not cached
+        if (playerInventory == null && ammoType != null)
+        {
+            playerInventory = GetComponentInParent<PlayerInventory>();
+            if (playerInventory == null)
+            {
+                PlayerController playerController = GetComponentInParent<PlayerController>();
+                if (playerController != null)
+                {
+                    playerInventory = playerController.GetComponent<PlayerInventory>();
+                }
+            }
+        }
+
+        // Check if we have ammo in inventory (if using inventory system)
+        if (playerInventory != null && ammoType != null)
+        {
+            // Check if we have at least 1 ammo in inventory
+            if (!playerInventory.HasAmmo(ammoType, 1))
+            {
+                // No ammo in inventory - cannot reload
+                return false;
+            }
+        }
+        else if (ammoType != null)
+        {
+            // If we have an ammo type but no inventory system, we can't reload
+            // (weapons without ammo types can still reload using the fallback system)
+            return false;
+        }
+
         // Start reload coroutine
         if (reloadCoroutine != null)
         {
@@ -574,8 +644,24 @@ public class Weapon : MonoBehaviour
             yield return null;
         }
 
-        // Refill magazine
-        currentAmmo = magazineSize;
+        // Refill magazine from inventory
+        if (playerInventory != null && ammoType != null)
+        {
+            int ammoNeeded = magazineSize - currentAmmo;
+            int ammoAvailable = playerInventory.GetAmmoCount(ammoType);
+            int ammoToLoad = Mathf.Min(ammoNeeded, ammoAvailable);
+            
+            if (ammoToLoad > 0)
+            {
+                playerInventory.RemoveAmmo(ammoType, ammoToLoad);
+                currentAmmo += ammoToLoad;
+            }
+        }
+        else
+        {
+            // Fallback: refill magazine if no inventory system
+            currentAmmo = magazineSize;
+        }
 
         // Smoothly transition back to base position before ending reload to prevent snap
         // This ensures PlayerController can smoothly take over control
@@ -641,8 +727,8 @@ public class Weapon : MonoBehaviour
         baseLocalPosition = positionOffset;
         baseLocalRotation = Quaternion.Euler(rotationOffset);
         
-        // Initialize ammo to full magazine
-        currentAmmo = magazineSize;
+        // Initialize ammo to 0 (will be loaded from inventory when equipped)
+        currentAmmo = 0;
         
         // Initialize default animation curves if not set
         if (recoilCurve == null || recoilCurve.length == 0)

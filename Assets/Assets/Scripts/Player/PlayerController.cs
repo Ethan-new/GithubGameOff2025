@@ -18,6 +18,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private Camera playerCamera;
     [SerializeField] private InputActionAsset inputActionsAsset;
     [SerializeField] private Transform weaponHolder; // Transform where weapons are held/positioned
+    [SerializeField] private PlayerInventory playerInventory; // Reference to player inventory (auto-found if not assigned)
 
     [Header("Inventory Settings")]
     [SerializeField] private int maxWeapons = 2;
@@ -125,6 +126,16 @@ public class PlayerController : MonoBehaviour
 
         // Initialize weapon inventory
         weaponInventory = new Weapon[maxWeapons];
+
+        // Find PlayerInventory if not assigned
+        if (playerInventory == null)
+        {
+            playerInventory = GetComponent<PlayerInventory>();
+            if (playerInventory == null)
+            {
+                playerInventory = GetComponentInChildren<PlayerInventory>();
+            }
+        }
 
         // Setup camera - ensure it's a child of the player (do this first so weapon holder can be parented to it)
         if (playerCamera == null)
@@ -1075,6 +1086,12 @@ public class PlayerController : MonoBehaviour
         Debug.Log($"Added weapon {weaponInstance.WeaponName} to slot {slot}, weapon holder: {weaponHolder != null}, local pos: {weaponInstance.transform.localPosition}");
         #endif
 
+        // Notify inventory system that weapon was added
+        if (playerInventory != null)
+        {
+            playerInventory.OnWeaponAdded(weaponInstance);
+        }
+
         // If no weapon is currently equipped, equip this one immediately (no animation for first weapon)
         if (currentWeaponIndex < 0)
         {
@@ -1115,6 +1132,13 @@ public class PlayerController : MonoBehaviour
                     break;
                 }
             }
+        }
+
+        // Notify inventory system that weapon was removed
+        Weapon weaponToRemove = weaponInventory[slot];
+        if (weaponToRemove != null && playerInventory != null)
+        {
+            playerInventory.OnWeaponRemoved(weaponToRemove);
         }
 
         weaponInventory[slot] = null;
