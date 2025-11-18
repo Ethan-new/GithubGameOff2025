@@ -2368,6 +2368,22 @@ PrefabInstance:
       propertyPath: m_TagString
       value: Player
       objectReference: {fileID: 0}
+    - target: {fileID: 6591188558156533447, guid: ddd43f993942d484ea3a962671089d25, type: 3}
+      propertyPath: startingAmmoTypes.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6591188558156533447, guid: ddd43f993942d484ea3a962671089d25, type: 3}
+      propertyPath: startingAmmoAmounts.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6591188558156533447, guid: ddd43f993942d484ea3a962671089d25, type: 3}
+      propertyPath: 'startingAmmoTypes.Array.data[0]'
+      value: 
+      objectReference: {fileID: 11400000, guid: 40521a91982814b0398d906fe5cc8500, type: 2}
+    - target: {fileID: 6591188558156533447, guid: ddd43f993942d484ea3a962671089d25, type: 3}
+      propertyPath: 'startingAmmoAmounts.Array.data[0]'
+      value: 120
+      objectReference: {fileID: 0}
     - target: {fileID: 7321075382374572986, guid: ddd43f993942d484ea3a962671089d25, type: 3}
       propertyPath: m_LocalPosition.x
       value: -0.30596

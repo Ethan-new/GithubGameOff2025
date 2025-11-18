@@ -143,7 +143,7 @@ public class Weapon : MonoBehaviour
             }
         }
         
-        // Initialize ammo if not already set
+        // Initialize ammo if not already set, or auto-load if starting with ammo (e.g., 120 bullets)
         if (currentAmmo == 0 && magazineSize > 0)
         {
             // Try to reload from inventory if available
@@ -164,6 +164,22 @@ public class Weapon : MonoBehaviour
             {
                 // Fallback: fill magazine if no inventory system
                 currentAmmo = magazineSize;
+            }
+        }
+        // Auto-load gun if starting with ammo (e.g., 120 bullets) - ensure magazine is full
+        else if (currentAmmo < magazineSize && magazineSize > 0)
+        {
+            // Try to reload from inventory if available
+            if (playerInventory != null && ammoType != null)
+            {
+                int ammoNeeded = magazineSize - currentAmmo;
+                int ammoAvailable = playerInventory.GetAmmoCount(ammoType);
+                int ammoToLoad = Mathf.Min(ammoNeeded, ammoAvailable);
+                if (ammoToLoad > 0)
+                {
+                    playerInventory.RemoveAmmo(ammoType, ammoToLoad);
+                    currentAmmo += ammoToLoad;
+                }
             }
         }
     }
@@ -748,6 +764,43 @@ public class Weapon : MonoBehaviour
                 new Keyframe(0f, 0f, 0f, 0f),  // Start at 0 with flat tangent
                 new Keyframe(1f, 1f, 2f, 0f)   // End at 1 with upward tangent
             );
+        }
+    }
+
+    protected virtual void Start()
+    {
+        // Auto-load gun when game starts if equipped and ammo is available (e.g., starting with 120 bullets)
+        if (isEquipped && currentAmmo < magazineSize && magazineSize > 0)
+        {
+            // Find PlayerInventory if not cached
+            if (playerInventory == null)
+            {
+                playerInventory = GetComponentInParent<PlayerInventory>();
+                if (playerInventory == null)
+                {
+                    PlayerController playerController = GetComponentInParent<PlayerController>();
+                    if (playerController != null)
+                    {
+                        playerInventory = playerController.GetComponent<PlayerInventory>();
+                    }
+                }
+            }
+
+            // Try to reload from inventory if available
+            if (playerInventory != null && ammoType != null)
+            {
+                int ammoNeeded = magazineSize - currentAmmo;
+                int ammoAvailable = playerInventory.GetAmmoCount(ammoType);
+                int ammoToLoad = Mathf.Min(ammoNeeded, ammoAvailable);
+                if (ammoToLoad > 0)
+                {
+                    playerInventory.RemoveAmmo(ammoType, ammoToLoad);
+                    currentAmmo += ammoToLoad;
+                    #if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    Debug.Log($"{weaponName} auto-loaded on game start - {currentAmmo}/{magazineSize} ammo");
+                    #endif
+                }
+            }
         }
     }
 
