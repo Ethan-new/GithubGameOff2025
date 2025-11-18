@@ -190,7 +190,7 @@ MonoBehaviour:
   ammoType: {fileID: 11400000, guid: 40521a91982814b0398d906fe5cc8500, type: 2}
   magazineSize: 12
   reloadTime: 2
-  reloadSound: {fileID: 0}
+  reloadSound: {fileID: 8300000, guid: 9fc1da11ec77331488a84813378a1d48, type: 3}
   reloadSoundVolume: 1
   reloadTiltAngle: 45
   reloadTiltAxis: {x: 0, y: 0, z: -1}

@@ -107,12 +107,12 @@ public class PlayerController : MonoBehaviour
                 {
                     Debug.LogWarning("Interact action not found in input actions!");
                 }
-                #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
                 else
                 {
                     Debug.Log("Interact action found successfully");
                 }
-                #endif
+#endif
             }
             else
             {
@@ -188,9 +188,9 @@ public class PlayerController : MonoBehaviour
         if (weaponHolder != null)
         {
             weaponHolder.gameObject.SetActive(true);
-            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"Weapon holder created at: {weaponHolder.position}, local: {weaponHolder.localPosition}, parent: {(weaponHolder.parent != null ? weaponHolder.parent.name : "null")}");
-            #endif
+#endif
         }
 
         // Initialize starting weapons
@@ -548,9 +548,9 @@ public class PlayerController : MonoBehaviour
     {
         if (interactPressed)
         {
-            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log("Interact pressed - attempting to pick up weapon");
-            #endif
+#endif
             TryPickupWeapon();
             interactPressed = false; // Reset interact input
         }
@@ -560,6 +560,13 @@ public class PlayerController : MonoBehaviour
     {
         if (reloadPressed)
         {
+            // Don't allow reloading while sprinting
+            if (isSprinting)
+            {
+                reloadPressed = false; // Reset reload input
+                return;
+            }
+
             Weapon currentWeapon = GetCurrentWeapon();
             if (currentWeapon != null && currentWeapon.IsEquipped)
             {
@@ -588,9 +595,9 @@ public class PlayerController : MonoBehaviour
         // Get the player's position (use camera position for more accurate detection)
         Vector3 checkPosition = playerCamera != null ? playerCamera.transform.position : transform.position;
 
-        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"Checking for weapons at position: {checkPosition}, range: {pickupRange}, layer mask: {weaponLayerMask.value}");
-        #endif
+#endif
 
         // Use non-allocating overlap sphere to find nearby weapons
         int hitCount = Physics.OverlapSphereNonAlloc(checkPosition, pickupRange, overlapResults, weaponLayerMask);
@@ -598,15 +605,15 @@ public class PlayerController : MonoBehaviour
         // If no colliders found with layer mask, try without layer mask
         if (hitCount == 0)
         {
-            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log("No colliders found with layer mask, trying without layer mask");
-            #endif
+#endif
             hitCount = Physics.OverlapSphereNonAlloc(checkPosition, pickupRange, overlapResults);
         }
 
-        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"Found {hitCount} colliders in range");
-        #endif
+#endif
 
         GroundWeapon nearestGroundWeapon = null;
         float nearestDistance = float.MaxValue;
@@ -631,9 +638,9 @@ public class PlayerController : MonoBehaviour
                 // Use the larger of pickupRange or the weapon's pickup radius
                 float effectiveRange = Mathf.Max(pickupRange, groundWeapon.PickupRadius);
 
-                #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.Log($"Found GroundWeapon: {groundWeapon.name}, distance: {distance}, effective range: {effectiveRange}");
-                #endif
+#endif
 
                 if (distance <= effectiveRange && distance < nearestDistance)
                 {
@@ -645,15 +652,15 @@ public class PlayerController : MonoBehaviour
 
         if (nearestGroundWeapon == null)
         {
-            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.LogWarning("No ground weapon found in range");
-            #endif
+#endif
             return;
         }
 
-        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"Found nearest weapon: {nearestGroundWeapon.name}");
-        #endif
+#endif
 
         Weapon weaponToPickup = nearestGroundWeapon.Weapon;
         if (weaponToPickup == null)
@@ -667,9 +674,9 @@ public class PlayerController : MonoBehaviour
             // Pick up weapon into empty slot
             PickupWeapon(weaponToPickup, emptySlot);
             nearestGroundWeapon.OnPickedUp();
-            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"Picked up {weaponToPickup.WeaponName}");
-            #endif
+#endif
         }
         else
         {
@@ -681,9 +688,9 @@ public class PlayerController : MonoBehaviour
                 {
                     SwapWeapon(weaponToPickup, currentWeapon, currentWeaponIndex);
                     nearestGroundWeapon.OnPickedUp();
-                    #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
                     Debug.Log($"Swapped {currentWeapon.WeaponName} for {weaponToPickup.WeaponName}");
-                    #endif
+#endif
                 }
             }
             else
@@ -696,9 +703,9 @@ public class PlayerController : MonoBehaviour
                         Weapon weaponToDrop = weaponInventory[i];
                         SwapWeapon(weaponToPickup, weaponToDrop, i);
                         nearestGroundWeapon.OnPickedUp();
-                        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
                         Debug.Log($"Swapped {weaponToDrop.WeaponName} for {weaponToPickup.WeaponName}");
-                        #endif
+#endif
                         break;
                     }
                 }
@@ -877,9 +884,9 @@ public class PlayerController : MonoBehaviour
             // Apply position offset
             newWeapon.OnEquip();
 
-            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"Equipped {newWeapon.WeaponName} immediately");
-            #endif
+#endif
         }
     }
 
@@ -997,9 +1004,9 @@ public class PlayerController : MonoBehaviour
         if (newWeapon != null)
         {
             newWeapon.OnEquip();
-            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"Switched to {newWeapon.WeaponName}");
-            #endif
+#endif
         }
 
         isSwappingWeapon = false;
@@ -1050,9 +1057,9 @@ public class PlayerController : MonoBehaviour
         {
             // This is a prefab, instantiate it
             weaponInstance = Instantiate(weapon);
-            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"Instantiated weapon prefab: {weaponInstance.WeaponName}");
-            #endif
+#endif
         }
 
         // Add the new weapon
@@ -1082,9 +1089,9 @@ public class PlayerController : MonoBehaviour
         weaponInstance.transform.localPosition = Vector3.zero;
         weaponInstance.transform.localRotation = Quaternion.identity;
 
-        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"Added weapon {weaponInstance.WeaponName} to slot {slot}, weapon holder: {weaponHolder != null}, local pos: {weaponInstance.transform.localPosition}");
-        #endif
+#endif
 
         // Notify inventory system that weapon was added
         if (playerInventory != null)
@@ -1267,14 +1274,14 @@ public class PlayerController : MonoBehaviour
 
         // Check if weapon is reloading - reload animation takes priority over walk/sprint animations
         bool isReloading = currentWeapon.IsReloading;
-        
+
         // Disable recoil transform updates when we're controlling the transform with walk/sprint animations
         // BUT allow reload animation to take priority - if reloading, don't control the transform
         bool isControllingTransform = (sprintAnimationIntensity > 0.01f || walkAnimationIntensity > 0.01f) && !isReloading;
         currentWeapon.SetAllowRecoilTransformUpdate(!isControllingTransform);
 
         // Don't apply walk/sprint animations if weapon is reloading (reload animation takes priority)
-        
+
         // Apply combined animation offset
         if (sprintAnimationIntensity > 0.01f && !isReloading)
         {
