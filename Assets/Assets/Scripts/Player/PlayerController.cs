@@ -215,6 +215,16 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    private void Start()
+    {
+        // Load saved settings if PlayerSettings exists
+        if (PlayerSettings.Instance != null)
+        {
+            float savedSensitivity = PlayerSettings.Instance.GetMouseSensitivity();
+            SetMouseSensitivity(savedSensitivity);
+        }
+    }
+
     private void OnEnable()
     {
         // Ensure InputActionAsset is enabled first
@@ -411,6 +421,12 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
+        // Check if game is paused - don't process input or lock cursor when paused
+        if (PauseManager.Instance != null && PauseManager.Instance.IsPaused)
+        {
+            return;
+        }
+
         // Ensure cursor stays locked during gameplay
         if (Cursor.lockState != CursorLockMode.Locked)
         {
@@ -1174,6 +1190,23 @@ public class PlayerController : MonoBehaviour
             return weaponInventory[slot];
         }
         return null;
+    }
+
+    /// <summary>
+    /// Gets the current mouse sensitivity.
+    /// </summary>
+    public float GetMouseSensitivity()
+    {
+        return mouseSensitivity;
+    }
+
+    /// <summary>
+    /// Sets the mouse sensitivity.
+    /// </summary>
+    /// <param name="sensitivity">The new sensitivity value.</param>
+    public void SetMouseSensitivity(float sensitivity)
+    {
+        mouseSensitivity = Mathf.Max(0.1f, sensitivity); // Ensure minimum value
     }
 
     private void LateUpdate()
