@@ -10,6 +10,7 @@ public class MysteryBoxInteractable : Interactable
     [Header("Mystery Box Settings")]
     [SerializeField] private bool hasBeenOpened = false;
     [SerializeField] private bool canBeOpenedMultipleTimes = false;
+    [SerializeField] private int openCost = 1000; // Cost to open the mystery box
 
     [Header("Weapon Cycling Settings")]
     [SerializeField] private Weapon[] availableWeapons; // Array of weapon prefabs to cycle through
@@ -19,9 +20,12 @@ public class MysteryBoxInteractable : Interactable
     [SerializeField] private float levitationSpeed = 0.5f; // How fast weapons levitate upward (units per second)
     [SerializeField] private Vector3 weaponSpawnOffset = new Vector3(0f, 1f, 0f); // Fallback offset if spawn position is not set
     [SerializeField] private float totalCycleDuration = 8f; // Total time for the mystery box cycle (seconds)
+    [SerializeField] private float weaponCloseTime = 5f; // Time before the weapon disappears (seconds)
+    [SerializeField] private float weaponDescendSpeed = 0.3f; // How fast the weapon descends before disappearing (units per second)
 
     private bool isCycling = false;
     private Coroutine cyclingCoroutine = null;
+    private Coroutine weaponCloseCoroutine = null;
     private Weapon currentDisplayedWeapon = null;
     private int currentWeaponIndex = 0;
     private int selectedWeaponIndex = -1; // The weapon that will be awarded at the end
@@ -31,8 +35,22 @@ public class MysteryBoxInteractable : Interactable
     {
         get
         {
-            // Can interact if: not cycling AND (box not opened OR can be opened multiple times) OR weapon is ready to swap
-            return base.CanInteract && ((canBeOpenedMultipleTimes || !hasBeenOpened) && !isCycling || weaponReadyToSwap);
+            // If weapon is ready to swap, can always interact
+            if (weaponReadyToSwap)
+            {
+                return base.CanInteract;
+            }
+            
+            // Check if box can be opened (not cycling, and either not opened or can be opened multiple times)
+            bool canOpen = (canBeOpenedMultipleTimes || !hasBeenOpened) && !isCycling;
+            if (!canOpen)
+            {
+                return false;
+            }
+            
+            // Return true so the prompt shows (even if player doesn't have enough money)
+            // The actual money check happens in OnInteract
+            return base.CanInteract;
         }
     }
 
@@ -44,7 +62,32 @@ public class MysteryBoxInteractable : Interactable
             {
                 return "Press E to swap weapon";
             }
-            return base.InteractionPrompt;
+            if (isCycling)
+            {
+                return "Opening...";
+            }
+            if (hasBeenOpened && !canBeOpenedMultipleTimes)
+            {
+                // Box has been opened and can't be opened again - shouldn't be interactable, but just in case
+                return "";
+            }
+            
+            // Check if player has enough money
+            if (MoneyManager.Instance != null)
+            {
+                bool hasEnoughMoney = MoneyManager.Instance.CurrentMoney >= openCost;
+                if (hasEnoughMoney)
+                {
+                    return $"Press E to open (${openCost})";
+                }
+                else
+                {
+                    return $"Not enough money (${openCost})";
+                }
+            }
+            
+            // Box can be opened (no money check - for testing/editor)
+            return $"Press E to open (${openCost})";
         }
     }
 
@@ -65,11 +108,26 @@ public class MysteryBoxInteractable : Interactable
             {
                 Debug.Log("Mystery box is currently cycling through weapons.");
             }
+            else if (MoneyManager.Instance != null && MoneyManager.Instance.CurrentMoney < openCost)
+            {
+                Debug.Log($"Not enough money to open mystery box. Need ${openCost}, have ${MoneyManager.Instance.CurrentMoney}.");
+            }
             else
             {
                 Debug.Log("This mystery box cannot be interacted with.");
             }
             return;
+        }
+
+        // Check if player has enough money and spend it
+        if (MoneyManager.Instance != null)
+        {
+            if (!MoneyManager.Instance.SpendMoney(openCost))
+            {
+                Debug.LogWarning($"MysteryBoxInteractable: Failed to spend ${openCost}. Player may not have enough money.");
+                return;
+            }
+            Debug.Log($"Mystery Box: Spent ${openCost} to open the box.");
         }
 
         // Start cycling through weapons
@@ -413,6 +471,13 @@ public class MysteryBoxInteractable : Interactable
         Debug.Log($"Mystery Box: Weapon {availableWeapons[selectedWeaponIndex].WeaponName} is ready! Press E to swap.");
 
         cyclingCoroutine = null;
+        
+        // Start the weapon close timer - weapon will descend and disappear
+        if (weaponCloseCoroutine != null)
+        {
+            StopCoroutine(weaponCloseCoroutine);
+        }
+        weaponCloseCoroutine = StartCoroutine(WeaponCloseCoroutine());
     }
 
     /// <summary>
@@ -498,6 +563,13 @@ public class MysteryBoxInteractable : Interactable
         
         Debug.Log($"Mystery Box: Successfully added and equipped weapon {weaponPrefab.WeaponName} at slot {slotToUse}");
         
+        // Stop the close coroutine if it's running
+        if (weaponCloseCoroutine != null)
+        {
+            StopCoroutine(weaponCloseCoroutine);
+            weaponCloseCoroutine = null;
+        }
+        
         // Clean up displayed weapon AFTER giving it to player
         if (currentDisplayedWeapon != null)
         {
@@ -508,6 +580,77 @@ public class MysteryBoxInteractable : Interactable
         // Reset state
         weaponReadyToSwap = false;
         selectedWeaponIndex = -1;
+    }
+
+    /// <summary>
+    /// Coroutine that makes the weapon descend and disappear after the close time.
+    /// </summary>
+    private IEnumerator WeaponCloseCoroutine()
+    {
+        if (currentDisplayedWeapon == null)
+        {
+            yield break;
+        }
+
+        // Get the current position (where weapon is displayed - spawn position)
+        Vector3 startPosition = currentDisplayedWeapon.transform.position;
+
+        // Calculate end position (where it should descend to)
+        Vector3 endPosition;
+        if (weaponStartPosition != null)
+        {
+            // Descend back to where it started from
+            endPosition = weaponStartPosition.position;
+        }
+        else
+        {
+            // If no start position set, just move down from spawn position
+            Vector3 spawnPos;
+            if (weaponSpawnPosition != null)
+            {
+                spawnPos = weaponSpawnPosition.position;
+            }
+            else
+            {
+                spawnPos = transform.position + weaponSpawnOffset;
+            }
+            // Move down by a reasonable amount (2 units)
+            endPosition = spawnPos - new Vector3(0f, 2f, 0f);
+        }
+
+        float elapsedTime = 0f;
+        float totalDistance = Vector3.Distance(startPosition, endPosition);
+
+        while (elapsedTime < weaponCloseTime && currentDisplayedWeapon != null)
+        {
+            float deltaTime = Time.deltaTime;
+            elapsedTime += deltaTime;
+
+            // Calculate how far down the weapon should move
+            float descendDistance = weaponDescendSpeed * elapsedTime;
+            descendDistance = Mathf.Clamp(descendDistance, 0f, totalDistance);
+
+            // Calculate position based on descent progress
+            float t = totalDistance > 0f ? descendDistance / totalDistance : 0f;
+            Vector3 currentPosition = Vector3.Lerp(startPosition, endPosition, t);
+            currentDisplayedWeapon.transform.position = currentPosition;
+
+            yield return null;
+        }
+
+        // Destroy the weapon after the close time
+        if (currentDisplayedWeapon != null)
+        {
+            Destroy(currentDisplayedWeapon.gameObject);
+            currentDisplayedWeapon = null;
+        }
+
+        // Reset state
+        weaponReadyToSwap = false;
+        selectedWeaponIndex = -1;
+        weaponCloseCoroutine = null;
+
+        Debug.Log("Mystery Box: Weapon disappeared. Mystery box can be opened again.");
     }
 
     /// <summary>
@@ -533,6 +676,13 @@ public class MysteryBoxInteractable : Interactable
         selectedWeaponIndex = -1;
         StopCycling();
         
+        // Stop the close coroutine if it's running
+        if (weaponCloseCoroutine != null)
+        {
+            StopCoroutine(weaponCloseCoroutine);
+            weaponCloseCoroutine = null;
+        }
+        
         // Clean up displayed weapon if any
         if (currentDisplayedWeapon != null)
         {
@@ -544,6 +694,11 @@ public class MysteryBoxInteractable : Interactable
     private void OnDestroy()
     {
         StopCycling();
+        if (weaponCloseCoroutine != null)
+        {
+            StopCoroutine(weaponCloseCoroutine);
+            weaponCloseCoroutine = null;
+        }
     }
 }
 

@@ -165,7 +165,7 @@ MonoBehaviour:
   rotationOffset: {x: 0, y: -90, z: 90}
   firePoint: {fileID: 3735651932675324473}
   fireSound: {fileID: 8300000, guid: e2cfc4baeb6f0124b9e6fe5bd955fd7e, type: 3}
-  fireSoundVolume: 0.3
+  fireSoundVolume: 0.1
   recoilPosition: {x: 0, y: 0, z: -0.1}
   recoilRotation: {x: -5, y: 0, z: 0}
   recoilDuration: 0.05
@@ -191,7 +191,7 @@ MonoBehaviour:
   magazineSize: 12
   reloadTime: 2
   reloadSound: {fileID: 8300000, guid: 9fc1da11ec77331488a84813378a1d48, type: 3}
-  reloadSoundVolume: 1
+  reloadSoundVolume: 0.3
   reloadTiltAngle: 45
   reloadTiltAxis: {x: 0, y: 0, z: -1}
   reloadPositionOffset: {x: 0, y: -0.2, z: 0}

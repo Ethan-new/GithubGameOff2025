@@ -142,6 +142,12 @@ public class EnemyHealth : MonoBehaviour
             ScoreManager.Instance.AddKillScore();
         }
 
+        // Award money for kill
+        if (MoneyManager.Instance != null)
+        {
+            MoneyManager.Instance.AddKillMoney();
+        }
+
         // Notify listeners (invoke before cleanup to ensure all subscribers are notified)
         OnDeath?.Invoke();
         
