@@ -14,6 +14,7 @@ public class MysteryBoxInteractable : Interactable
     [Header("Weapon Cycling Settings")]
     [SerializeField] private Weapon[] availableWeapons; // Array of weapon prefabs to cycle through
     [SerializeField] private Transform weaponSpawnPosition; // Empty GameObject that marks where weapons spawn (if null, uses box position + offset)
+    [SerializeField] private Transform weaponStartPosition; // Empty GameObject that marks where weapons start (if null, uses weaponSpawnPosition)
     [SerializeField] private float weaponSwitchInterval = 0.1f; // How fast weapons switch (seconds between switches)
     [SerializeField] private float levitationSpeed = 0.5f; // How fast weapons levitate upward (units per second)
     [SerializeField] private Vector3 weaponSpawnOffset = new Vector3(0f, 1f, 0f); // Fallback offset if spawn position is not set
@@ -207,8 +208,20 @@ public class MysteryBoxInteractable : Interactable
             spawnPosition = transform.position + weaponSpawnOffset;
         }
         
+        // Use the start position GameObject if set, otherwise use spawn position
+        Vector3 startPosition;
+        if (weaponStartPosition != null)
+        {
+            startPosition = weaponStartPosition.position;
+        }
+        else
+        {
+            startPosition = spawnPosition;
+        }
+        
         float totalElapsedTime = 0f;
-        float levitationHeight = 0f;
+        float levitationDistance = 0f; // Distance traveled from start position
+        float totalDistance = Vector3.Distance(startPosition, spawnPosition); // Total distance to travel
         bool showingSelectedWeapon = false;
 
         while (isCycling && totalElapsedTime < totalCycleDuration)
@@ -228,7 +241,7 @@ public class MysteryBoxInteractable : Interactable
             }
             else if (!shouldShowSelected)
             {
-                // Normal cycling - show random weapons (pick a random weapon each time for more variety)
+                // Normal cycling - show random weapons
                 weaponToShow = Random.Range(0, availableWeapons.Length);
                 currentWeaponIndex = weaponToShow;
             }
@@ -238,19 +251,45 @@ public class MysteryBoxInteractable : Interactable
                 weaponToShow = selectedWeaponIndex;
             }
 
-            // Destroy previous weapon if it exists and we're switching
-            if (currentDisplayedWeapon != null && (!shouldShowSelected || !showingSelectedWeapon))
+            // Destroy previous weapon if we're switching to a different one
+            if (currentDisplayedWeapon != null)
             {
-                Destroy(currentDisplayedWeapon.gameObject);
-                currentDisplayedWeapon = null;
-                levitationHeight = 0f; // Reset height for new weapon
+                // Check if we need to switch weapons
+                bool needsSwitch = false;
+                
+                // Get current weapon index
+                int currentWeaponIdx = -1;
+                for (int i = 0; i < availableWeapons.Length; i++)
+                {
+                    if (availableWeapons[i] != null && currentDisplayedWeapon.gameObject.name.Contains(availableWeapons[i].gameObject.name.Replace("(Clone)", "")))
+                    {
+                        currentWeaponIdx = i;
+                        break;
+                    }
+                }
+                
+                // Switch if we're showing a different weapon
+                if (currentWeaponIdx != weaponToShow)
+                {
+                    needsSwitch = true;
+                }
+                
+                if (needsSwitch)
+                {
+                    Destroy(currentDisplayedWeapon.gameObject);
+                    currentDisplayedWeapon = null;
+                    // Don't reset levitation distance - keep it continuous
+                }
             }
 
-            // Spawn the weapon if we don't have one or we're switching
+            // Spawn the weapon if we don't have one
             if (currentDisplayedWeapon == null && weaponToShow < availableWeapons.Length && availableWeapons[weaponToShow] != null)
             {
                 Weapon weaponPrefab = availableWeapons[weaponToShow];
-                GameObject weaponObj = Instantiate(weaponPrefab.gameObject, spawnPosition, Quaternion.identity);
+                // Spawn at current levitation position
+                float t = totalDistance > 0f ? Mathf.Clamp01(levitationDistance / totalDistance) : 0f;
+                Vector3 spawnPos = Vector3.Lerp(startPosition, spawnPosition, t);
+                GameObject weaponObj = Instantiate(weaponPrefab.gameObject, spawnPos, Quaternion.identity);
                 currentDisplayedWeapon = weaponObj.GetComponent<Weapon>();
                 
                 if (currentDisplayedWeapon == null)
@@ -260,10 +299,7 @@ public class MysteryBoxInteractable : Interactable
 
                 if (currentDisplayedWeapon != null)
                 {
-                    // Disable weapon behavior (don't want it to fire or be picked up during cycling)
                     currentDisplayedWeapon.enabled = false;
-                    
-                    // Disable colliders so it doesn't interfere
                     Collider[] colliders = weaponObj.GetComponentsInChildren<Collider>();
                     foreach (Collider col in colliders)
                     {
@@ -272,7 +308,7 @@ public class MysteryBoxInteractable : Interactable
                 }
             }
 
-            // Wait for switch interval (or until cycle ends)
+            // Wait for switch interval (or until cycle ends) and continue levitating
             float intervalElapsed = 0f;
             while (intervalElapsed < weaponSwitchInterval && totalElapsedTime < totalCycleDuration)
             {
@@ -280,21 +316,19 @@ public class MysteryBoxInteractable : Interactable
                 intervalElapsed += deltaTime;
                 totalElapsedTime += deltaTime;
                 
-                // Levitate the weapon upward
+                // Continue levitating while swapping
+                levitationDistance += levitationSpeed * deltaTime;
+                levitationDistance = Mathf.Clamp(levitationDistance, 0f, totalDistance);
+                
+                // Update weapon position based on current levitation progress
                 if (currentDisplayedWeapon != null)
                 {
-                    levitationHeight += levitationSpeed * deltaTime;
-                    Vector3 currentPosition = spawnPosition + new Vector3(0f, levitationHeight, 0f);
+                    float t = totalDistance > 0f ? levitationDistance / totalDistance : 0f;
+                    Vector3 currentPosition = Vector3.Lerp(startPosition, spawnPosition, t);
                     currentDisplayedWeapon.transform.position = currentPosition;
                 }
 
                 yield return null;
-            }
-
-            // Move to next weapon (only if not showing selected weapon yet)
-            if (!shouldShowSelected && !showingSelectedWeapon)
-            {
-                currentWeaponIndex = (currentWeaponIndex + 1) % availableWeapons.Length;
             }
         }
 
@@ -333,6 +367,7 @@ public class MysteryBoxInteractable : Interactable
             if (selectedWeaponIndex >= 0 && selectedWeaponIndex < availableWeapons.Length && availableWeapons[selectedWeaponIndex] != null)
             {
                 Weapon weaponPrefab = availableWeapons[selectedWeaponIndex];
+                // Position at the final spawn position (where it should end up)
                 GameObject weaponObj = Instantiate(weaponPrefab.gameObject, spawnPosition, Quaternion.identity);
                 currentDisplayedWeapon = weaponObj.GetComponent<Weapon>();
                 
@@ -350,8 +385,8 @@ public class MysteryBoxInteractable : Interactable
                         col.enabled = false;
                     }
                     
-                    // Position the weapon at the current levitation height
-                    currentDisplayedWeapon.transform.position = spawnPosition + new Vector3(0f, levitationHeight, 0f);
+                    // Position the weapon at the spawn position (final position)
+                    currentDisplayedWeapon.transform.position = spawnPosition;
                     
                     Debug.Log($"Mystery Box: Final weapon displayed - {weaponPrefab.gameObject.name} (selected index: {selectedWeaponIndex})");
                 }
