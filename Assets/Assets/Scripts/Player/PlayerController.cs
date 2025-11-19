@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
+using System.Collections.Generic;
 
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
@@ -28,6 +29,11 @@ public class PlayerController : MonoBehaviour
     [Header("Pickup Settings")]
     [SerializeField] private float pickupRange = 3f;
     [SerializeField] private LayerMask weaponLayerMask = -1; // All layers by default
+
+    [Header("Interaction Settings")]
+    [SerializeField] private float interactionRange = 5f;
+    [SerializeField] private LayerMask interactableLayerMask = -1; // All layers by default
+    [SerializeField] private LayerMask obstacleLayerMask = -1; // Layers that block line of sight
 
     [Header("Weapon Swap Animation")]
     [SerializeField] private float swapAnimationDuration = 0.5f;
@@ -68,6 +74,9 @@ public class PlayerController : MonoBehaviour
     private bool attackPressedThisFrame; // For single fire weapons
     private bool interactPressed;
     private bool reloadPressed;
+
+    // Current interactable object the player is looking at (for UI display)
+    private IInteractable currentInteractable;
 
     private float horizontalRotation = 0f;
     private float verticalRotation = 0f;
@@ -441,6 +450,7 @@ public class PlayerController : MonoBehaviour
         HandleInteract();
         HandleReload();
         HandleWeaponSelection();
+        UpdateCurrentInteractable();
     }
 
     private void HandleMouseLook()
@@ -574,11 +584,273 @@ public class PlayerController : MonoBehaviour
         if (interactPressed)
         {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            Debug.Log("Interact pressed - attempting to pick up weapon");
+            Debug.Log("Interact pressed - checking for interactable objects");
 #endif
+            // First, try to interact with an interactable object (doors, mystery boxes, etc.)
+            if (TryInteractWithObject())
+            {
+                interactPressed = false; // Reset interact input
+                return;
+            }
+
+            // If no interactable object found, try to pick up weapon (backward compatibility)
             TryPickupWeapon();
             interactPressed = false; // Reset interact input
         }
+    }
+
+    /// <summary>
+    /// Attempts to find and interact with an interactable object the player is looking at.
+    /// Returns true if an interaction occurred.
+    /// </summary>
+    private bool TryInteractWithObject()
+    {
+        if (playerCamera == null)
+            return false;
+
+        // Cast a ray from the camera forward to detect interactable objects
+        Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
+        RaycastHit[] hits = Physics.RaycastAll(ray, interactionRange, interactableLayerMask);
+
+        // If no hits with layer mask, try without layer mask
+        if (hits.Length == 0)
+        {
+            hits = Physics.RaycastAll(ray, interactionRange);
+        }
+
+        // Sort hits by distance to get the closest one
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        // Find the first valid interactable object
+        foreach (RaycastHit hit in hits)
+        {
+            if (hit.collider == null)
+                continue;
+
+            // Check for IInteractable component
+            IInteractable interactable = hit.collider.GetComponent<IInteractable>();
+            if (interactable == null)
+            {
+                // Also check parent objects
+                interactable = hit.collider.GetComponentInParent<IInteractable>();
+            }
+
+            if (interactable != null && interactable.CanInteract)
+            {
+                // Check if within range
+                if (interactable.IsInRange(playerCamera.transform.position))
+                {
+                    // Check line of sight if required
+                    if (interactable is Interactable interactableComponent)
+                    {
+                        if (!interactableComponent.HasLineOfSight(playerCamera.transform.position, obstacleLayerMask))
+                        {
+                            continue; // Try next hit
+                        }
+                    }
+
+                    // Found a valid interactable object - interact with it
+                    interactable.OnInteract(gameObject);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    Debug.Log($"Interacted with: {hit.collider.name}");
+#endif
+                    return true;
+                }
+            }
+        }
+
+        // Also check for interactables in a sphere around the player (for objects without colliders or for proximity-based interactions)
+        Vector3 checkPosition = playerCamera != null ? playerCamera.transform.position : transform.position;
+        Collider[] nearbyColliders = Physics.OverlapSphere(checkPosition, interactionRange, interactableLayerMask);
+
+        if (nearbyColliders.Length == 0)
+        {
+            nearbyColliders = Physics.OverlapSphere(checkPosition, interactionRange);
+        }
+
+        IInteractable nearestInteractable = null;
+        float nearestDistance = float.MaxValue;
+
+        foreach (Collider col in nearbyColliders)
+        {
+            if (col == null)
+                continue;
+
+            IInteractable interactable = col.GetComponent<IInteractable>();
+            if (interactable == null)
+            {
+                interactable = col.GetComponentInParent<IInteractable>();
+            }
+
+            if (interactable != null && interactable.CanInteract)
+            {
+                float distance = Vector3.Distance(checkPosition, col.transform.position);
+                if (distance <= interactable.InteractionRange && distance < nearestDistance)
+                {
+                    // Check line of sight if required
+                    if (interactable is Interactable interactableComponent)
+                    {
+                        if (interactableComponent.HasLineOfSight(checkPosition, obstacleLayerMask))
+                        {
+                            nearestDistance = distance;
+                            nearestInteractable = interactable;
+                        }
+                    }
+                    else
+                    {
+                        nearestDistance = distance;
+                        nearestInteractable = interactable;
+                    }
+                }
+            }
+        }
+
+        if (nearestInteractable != null)
+        {
+            nearestInteractable.OnInteract(gameObject);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.Log($"Interacted with nearby object: {nearestInteractable.InteractionPrompt}");
+#endif
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Updates the current interactable object the player is looking at (for UI display).
+    /// </summary>
+    private void UpdateCurrentInteractable()
+    {
+        if (playerCamera == null)
+        {
+            currentInteractable = null;
+            return;
+        }
+
+        // Cast a ray from the camera forward to detect interactable objects
+        Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
+        RaycastHit[] hits = Physics.RaycastAll(ray, interactionRange, interactableLayerMask);
+
+        // If no hits with layer mask, try without layer mask
+        if (hits.Length == 0)
+        {
+            hits = Physics.RaycastAll(ray, interactionRange);
+        }
+
+        // Sort hits by distance to get the closest one
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        // Find the first valid interactable object
+        IInteractable foundInteractable = null;
+        foreach (RaycastHit hit in hits)
+        {
+            if (hit.collider == null)
+                continue;
+
+            // Check for IInteractable component
+            IInteractable interactable = hit.collider.GetComponent<IInteractable>();
+            if (interactable == null)
+            {
+                // Also check parent objects
+                interactable = hit.collider.GetComponentInParent<IInteractable>();
+            }
+
+            if (interactable != null && interactable.CanInteract)
+            {
+                // Check if within range
+                if (interactable.IsInRange(playerCamera.transform.position))
+                {
+                    // Check line of sight if required
+                    if (interactable is Interactable interactableComponent)
+                    {
+                        if (!interactableComponent.HasLineOfSight(playerCamera.transform.position, obstacleLayerMask))
+                        {
+                            continue; // Try next hit
+                        }
+                    }
+
+                    foundInteractable = interactable;
+                    break;
+                }
+            }
+        }
+
+        // If no interactable found via raycast, check nearby objects
+        if (foundInteractable == null)
+        {
+            Vector3 checkPosition = playerCamera != null ? playerCamera.transform.position : transform.position;
+            Collider[] nearbyColliders = Physics.OverlapSphere(checkPosition, interactionRange, interactableLayerMask);
+
+            if (nearbyColliders.Length == 0)
+            {
+                nearbyColliders = Physics.OverlapSphere(checkPosition, interactionRange);
+            }
+
+            IInteractable nearestInteractable = null;
+            float nearestDistance = float.MaxValue;
+
+            foreach (Collider col in nearbyColliders)
+            {
+                if (col == null)
+                    continue;
+
+                IInteractable interactable = col.GetComponent<IInteractable>();
+                if (interactable == null)
+                {
+                    interactable = col.GetComponentInParent<IInteractable>();
+                }
+
+                if (interactable != null && interactable.CanInteract)
+                {
+                    float distance = Vector3.Distance(checkPosition, col.transform.position);
+                    if (distance <= interactable.InteractionRange && distance < nearestDistance)
+                    {
+                        // Check line of sight if required
+                        if (interactable is Interactable interactableComponent)
+                        {
+                            if (interactableComponent.HasLineOfSight(checkPosition, obstacleLayerMask))
+                            {
+                                nearestDistance = distance;
+                                nearestInteractable = interactable;
+                            }
+                        }
+                        else
+                        {
+                            nearestDistance = distance;
+                            nearestInteractable = interactable;
+                        }
+                    }
+                }
+            }
+
+            foundInteractable = nearestInteractable;
+        }
+
+        // Update current interactable and call look at/away methods
+        if (currentInteractable != foundInteractable)
+        {
+            if (currentInteractable != null)
+            {
+                currentInteractable.OnLookAway();
+            }
+
+            currentInteractable = foundInteractable;
+
+            if (currentInteractable != null)
+            {
+                currentInteractable.OnLookAt();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the current interactable object the player is looking at (for UI display).
+    /// Returns null if no interactable is in range.
+    /// </summary>
+    public IInteractable GetCurrentInteractable()
+    {
+        return currentInteractable;
     }
 
     private void HandleWeaponSelection()
@@ -1280,6 +1552,56 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
+    /// Gets the slot index of the currently equipped weapon. Returns -1 if no weapon is equipped.
+    /// </summary>
+    public int GetCurrentWeaponSlot()
+    {
+        return currentWeaponIndex;
+    }
+
+    /// <summary>
+    /// Removes the currently equipped weapon and returns its slot index. Returns -1 if no weapon was equipped.
+    /// </summary>
+    public int RemoveCurrentWeapon()
+    {
+        if (currentWeaponIndex < 0 || currentWeaponIndex >= weaponInventory.Length)
+            return -1;
+
+        if (weaponInventory[currentWeaponIndex] == null)
+            return -1;
+
+        int slotToRemove = currentWeaponIndex;
+        Weapon weaponToRemove = weaponInventory[slotToRemove];
+
+        // Unequip the weapon
+        if (weaponToRemove != null)
+        {
+            weaponToRemove.OnUnequip();
+        }
+
+        // Notify inventory system that weapon was removed
+        if (weaponToRemove != null && playerInventory != null)
+        {
+            playerInventory.OnWeaponRemoved(weaponToRemove);
+        }
+
+        // Destroy the weapon GameObject
+        if (weaponToRemove != null)
+        {
+            Destroy(weaponToRemove.gameObject);
+        }
+
+        // Clear the slot
+        weaponInventory[slotToRemove] = null;
+        currentWeaponIndex = -1;
+
+        // Don't auto-switch to another weapon - let the caller handle what to do next
+        // This ensures we know exactly which slot was cleared
+
+        return slotToRemove;
+    }
+
+    /// <summary>
     /// Gets the weapon at the specified slot.
     /// </summary>
     public Weapon GetWeapon(int slot)
@@ -1289,6 +1611,64 @@ public class PlayerController : MonoBehaviour
             return weaponInventory[slot];
         }
         return null;
+    }
+
+    /// <summary>
+    /// Gets all weapons currently in the player's inventory (excluding null slots).
+    /// </summary>
+    public List<Weapon> GetAllWeapons()
+    {
+        List<Weapon> weapons = new List<Weapon>();
+        if (weaponInventory != null)
+        {
+            foreach (Weapon weapon in weaponInventory)
+            {
+                if (weapon != null)
+                {
+                    weapons.Add(weapon);
+                }
+            }
+        }
+        return weapons;
+    }
+
+    /// <summary>
+    /// Checks if the player has a weapon of the same type in their inventory.
+    /// Compares by prefab name (the original prefab name, not the WeaponName field).
+    /// </summary>
+    public bool HasWeapon(Weapon weaponPrefab)
+    {
+        if (weaponPrefab == null)
+            return false;
+
+        // Get the prefab name (the actual GameObject name from the prefab)
+        string prefabName = weaponPrefab.gameObject.name;
+        
+        // Remove "(Clone)" suffix if present (from instantiated objects)
+        if (prefabName.EndsWith("(Clone)"))
+        {
+            prefabName = prefabName.Substring(0, prefabName.Length - 7);
+        }
+
+        List<Weapon> playerWeapons = GetAllWeapons();
+        foreach (Weapon playerWeapon in playerWeapons)
+        {
+            if (playerWeapon != null)
+            {
+                // Compare by the original prefab name
+                string playerWeaponName = playerWeapon.gameObject.name;
+                if (playerWeaponName.EndsWith("(Clone)"))
+                {
+                    playerWeaponName = playerWeaponName.Substring(0, playerWeaponName.Length - 7);
+                }
+                
+                if (playerWeaponName == prefabName)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /// <summary>
