@@ -128,6 +128,12 @@ public class InteractionPromptUI : MonoBehaviour
             currentInteractable = newInteractable;
             UpdatePromptDisplay();
         }
+        else if (currentInteractable != null)
+        {
+            // Also update if we're still looking at the same interactable
+            // This allows prompts to update dynamically (e.g., money changes, weapon ownership changes)
+            UpdatePromptDisplay();
+        }
     }
 
     /// <summary>
