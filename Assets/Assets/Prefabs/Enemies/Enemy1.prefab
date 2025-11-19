@@ -305,7 +305,7 @@ MonoBehaviour:
   maxVerticalDistance: 20
   acceleration: 8
   autoBraking: 0
-  baseOffset: 0
+  baseOffset: 0.85
   target: {fileID: 0}
   targetTag: Player
   autoFindTarget: 1
