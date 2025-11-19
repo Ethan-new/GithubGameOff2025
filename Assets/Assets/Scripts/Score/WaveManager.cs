@@ -20,6 +20,9 @@ public class WaveManager : MonoBehaviour
     [SerializeField] private float enemiesPerWaveMultiplier = 1.2f; // Each wave increases by this multiplier
     [SerializeField] private float spawnInterval = 0.5f; // Time between individual enemy spawns
     [SerializeField] private int maxConcurrentSpawns = 3; // Max enemies spawning at once
+    [SerializeField] private int maxEnemiesAlive = 10; // Maximum number of enemies that can be alive at once
+    [SerializeField] private float minSpawnDistance = 2f; // Minimum distance from other enemies when spawning
+    [SerializeField] private float spawnOffsetRadius = 0.5f; // Random offset radius to prevent exact overlaps
 
     [Header("Difficulty Scaling")]
     [SerializeField] private float healthMultiplierPerWave = 1.1f; // Enemy health increases by this per wave
@@ -151,6 +154,7 @@ public class WaveManager : MonoBehaviour
 
     /// <summary>
     /// Coroutine that spawns all enemies for the current wave.
+    /// Spawns enemies slowly over time, respecting the max enemies alive limit.
     /// </summary>
     private IEnumerator SpawnWaveEnemies()
     {
@@ -158,23 +162,72 @@ public class WaveManager : MonoBehaviour
 
         while (enemiesSpawned < enemiesToSpawn)
         {
-            int spawnsThisBatch = Mathf.Min(maxConcurrentSpawns, enemiesToSpawn - enemiesSpawned);
+            // Calculate how many enemies we can spawn in this batch
+            // Don't spawn more than maxConcurrentSpawns at once
+            // Don't spawn more than remaining enemies to spawn
+            // Don't spawn if we're at the max alive limit
+            int availableSlots = maxEnemiesAlive - enemiesAlive;
+            int remainingToSpawn = enemiesToSpawn - enemiesSpawned;
+            int spawnsThisBatch = Mathf.Min(maxConcurrentSpawns, remainingToSpawn, availableSlots);
 
-            for (int i = 0; i < spawnsThisBatch; i++)
+            if (spawnsThisBatch > 0)
             {
-                SpawnEnemy();
+                for (int i = 0; i < spawnsThisBatch; i++)
+                {
+                    SpawnEnemy();
+                }
             }
 
-            enemiesSpawned += spawnsThisBatch;
-
-            // Wait before spawning next batch
-            if (enemiesSpawned < enemiesToSpawn)
-            {
-                yield return new WaitForSeconds(spawnInterval);
-            }
+            // Wait before checking again
+            yield return new WaitForSeconds(spawnInterval);
         }
 
         isSpawning = false;
+    }
+
+    /// <summary>
+    /// Finds a spawn point that doesn't have enemies too close to it.
+    /// Tries multiple spawn points to find a safe one.
+    /// </summary>
+    private EnemySpawnPoint FindSafeSpawnPoint()
+    {
+        if (spawnGrid == null)
+            return null;
+
+        List<EnemySpawnPoint> enabledPoints = spawnGrid.GetEnabledSpawnPoints();
+        if (enabledPoints == null || enabledPoints.Count == 0)
+            return null;
+
+        // Try up to 10 random spawn points to find a safe one
+        int attempts = Mathf.Min(10, enabledPoints.Count);
+        for (int i = 0; i < attempts; i++)
+        {
+            EnemySpawnPoint candidate = enabledPoints[Random.Range(0, enabledPoints.Count)];
+            
+            // Check if there are any enemies too close to this spawn point
+            bool isSafe = true;
+            foreach (GameObject enemy in activeEnemies)
+            {
+                if (enemy == null)
+                    continue;
+
+                float distance = Vector3.Distance(candidate.Position, enemy.transform.position);
+                if (distance < minSpawnDistance)
+                {
+                    isSafe = false;
+                    break;
+                }
+            }
+
+            if (isSafe)
+            {
+                return candidate;
+            }
+        }
+
+        // If no safe spawn point found, return a random one anyway
+        // (better than not spawning at all)
+        return enabledPoints[Random.Range(0, enabledPoints.Count)];
     }
 
     /// <summary>
@@ -182,6 +235,12 @@ public class WaveManager : MonoBehaviour
     /// </summary>
     private void SpawnEnemy()
     {
+        // Safety check: Don't spawn more enemies than intended for this wave
+        if (enemiesSpawned >= enemiesToSpawn)
+        {
+            return;
+        }
+
         if (spawnGrid == null)
         {
             Debug.LogError("WaveManager: Cannot spawn enemy - no spawn grid assigned!");
@@ -194,11 +253,11 @@ public class WaveManager : MonoBehaviour
             return;
         }
 
-        // Get a random enabled spawn point
-        EnemySpawnPoint spawnPoint = spawnGrid.GetRandomEnabledSpawnPoint();
+        // Find a safe spawn point (one without enemies too close)
+        EnemySpawnPoint spawnPoint = FindSafeSpawnPoint();
         if (spawnPoint == null)
         {
-            Debug.LogWarning("WaveManager: No enabled spawn points available!");
+            Debug.LogWarning("WaveManager: No safe spawn points available!");
             return;
         }
 
@@ -210,10 +269,16 @@ public class WaveManager : MonoBehaviour
             return;
         }
 
+        // Calculate spawn position with small random offset to prevent exact overlaps
+        Vector3 spawnPosition = spawnPoint.Position;
+        Vector2 randomOffset = Random.insideUnitCircle * spawnOffsetRadius;
+        spawnPosition += new Vector3(randomOffset.x, 0f, randomOffset.y);
+
         // Spawn the enemy
-        GameObject enemy = Instantiate(enemyPrefab, spawnPoint.Position, spawnPoint.Rotation);
+        GameObject enemy = Instantiate(enemyPrefab, spawnPosition, spawnPoint.Rotation);
         activeEnemies.Add(enemy);
         enemiesAlive++;
+        enemiesSpawned++; // Track total enemies spawned for this wave
 
         // Scale enemy stats based on wave
         ScaleEnemyForWave(enemy);
@@ -287,8 +352,17 @@ public class WaveManager : MonoBehaviour
 
         OnEnemyDied?.Invoke(enemy);
 
+        // Spawn a new enemy if there are still enemies left to spawn for this wave
+        // and we're below the max alive limit, but only while actively spawning
+        // (The coroutine will handle spawning, but we can help fill slots as enemies die)
+        if (isWaveActive && isSpawning && enemiesSpawned < enemiesToSpawn && enemiesAlive < maxEnemiesAlive)
+        {
+            SpawnEnemy();
+        }
+
         // Check if wave is complete
-        if (waitForAllEnemiesKilled && !isSpawning && enemiesAlive <= 0)
+        // Wave completes when all enemies have been spawned AND all are killed
+        if (waitForAllEnemiesKilled && enemiesSpawned >= enemiesToSpawn && enemiesAlive <= 0)
         {
             CompleteWave();
         }
@@ -386,7 +460,8 @@ public class WaveManager : MonoBehaviour
         activeEnemies.RemoveAll(enemy => enemy == null);
 
         // Check for wave completion if not waiting for all enemies killed
-        if (!waitForAllEnemiesKilled && isWaveActive && !isSpawning && enemiesAlive <= 0)
+        // Wave completes when all enemies have been spawned AND all are killed
+        if (!waitForAllEnemiesKilled && isWaveActive && enemiesSpawned >= enemiesToSpawn && enemiesAlive <= 0)
         {
             CompleteWave();
         }
