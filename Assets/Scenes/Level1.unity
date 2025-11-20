@@ -419,6 +419,10 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7836857798839533072, guid: ddd43f993942d484ea3a962671089d25, type: 3}
+      propertyPath: jumpForce
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 7836857798839533072, guid: ddd43f993942d484ea3a962671089d25, type: 3}
       propertyPath: startingWeapons.Array.size
       value: 1
       objectReference: {fileID: 0}
@@ -3911,6 +3915,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WaveUI
   wavePrefix: 'Wave: '
   showPrefix: 1
+  blinkSpeed: 1.5
+  minAlpha: 0.3
+  maxAlpha: 1
   waveTextTMP: {fileID: 1730389956}
 --- !u!114 &1730389956
 MonoBehaviour:
