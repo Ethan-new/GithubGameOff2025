@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 #if UNITY_TEXTMESHPRO
 using TMPro;
@@ -14,6 +15,11 @@ public class WaveUI : MonoBehaviour
     [SerializeField] private string wavePrefix = "Wave: ";
     [SerializeField] private bool showPrefix = true;
 
+    [Header("Blink Animation")]
+    [SerializeField] private float blinkSpeed = 1.5f; // Speed of the blink animation (cycles per second)
+    [SerializeField] private float minAlpha = 0.3f; // Minimum alpha value when blinking (0-1)
+    [SerializeField] private float maxAlpha = 1.0f; // Maximum alpha value when blinking (0-1)
+
     [Header("Text Component (Auto-detected if not assigned)")]
     [Tooltip("TextMeshProUGUI component to display the wave. Drag your TextMeshPro component here or use 'Auto-Find Text Component' from the context menu.")]
     [SerializeField] 
@@ -24,6 +30,8 @@ public class WaveUI : MonoBehaviour
 #endif
     
     private WaveManager waveManager;
+    private Coroutine blinkCoroutine;
+    private Color originalColor;
 
     private void Awake()
     {
@@ -105,9 +113,13 @@ public class WaveUI : MonoBehaviour
         // Subscribe to wave changes
         if (waveManager != null)
         {
-            waveManager.OnWaveStart += UpdateWaveDisplay;
+            waveManager.OnWaveStart += OnWaveStart;
+            waveManager.OnWaveComplete += OnWaveComplete;
             // Initialize display with current wave
             UpdateWaveDisplay(waveManager.CurrentWave);
+            
+            // Store original color for blinking
+            StoreOriginalColor();
         }
     }
 
@@ -189,8 +201,169 @@ public class WaveUI : MonoBehaviour
         // Unsubscribe from wave changes
         if (waveManager != null)
         {
-            waveManager.OnWaveStart -= UpdateWaveDisplay;
+            waveManager.OnWaveStart -= OnWaveStart;
+            waveManager.OnWaveComplete -= OnWaveComplete;
         }
+        
+        // Stop blinking coroutine if running
+        if (blinkCoroutine != null)
+        {
+            StopCoroutine(blinkCoroutine);
+            blinkCoroutine = null;
+        }
+    }
+    
+    /// <summary>
+    /// Stores the original color of the text for blinking animation.
+    /// </summary>
+    private void StoreOriginalColor()
+    {
+#if UNITY_TEXTMESHPRO
+        if (waveTextTMP != null)
+        {
+            originalColor = waveTextTMP.color;
+        }
+#else
+        // Try to get color using reflection
+        if (waveTextTMP != null)
+        {
+            var colorProperty = waveTextTMP.GetType().GetProperty("color");
+            if (colorProperty != null)
+            {
+                originalColor = (Color)colorProperty.GetValue(waveTextTMP);
+            }
+        }
+#endif
+    }
+    
+    /// <summary>
+    /// Called when a wave starts. Stops blinking and updates the display.
+    /// </summary>
+    private void OnWaveStart(int wave)
+    {
+        // Stop blinking when new wave starts
+        StopBlinking();
+        UpdateWaveDisplay(wave);
+    }
+    
+    /// <summary>
+    /// Called when a wave completes. Starts blinking animation.
+    /// </summary>
+    private void OnWaveComplete(int wave)
+    {
+        // Start blinking when wave completes (during transition to next wave)
+        StartBlinking();
+    }
+    
+    /// <summary>
+    /// Starts the blinking animation coroutine.
+    /// </summary>
+    private void StartBlinking()
+    {
+        // Stop any existing blink coroutine
+        if (blinkCoroutine != null)
+        {
+            StopCoroutine(blinkCoroutine);
+        }
+        
+        blinkCoroutine = StartCoroutine(BlinkAnimation());
+    }
+    
+    /// <summary>
+    /// Stops the blinking animation and restores original color.
+    /// </summary>
+    private void StopBlinking()
+    {
+        if (blinkCoroutine != null)
+        {
+            StopCoroutine(blinkCoroutine);
+            blinkCoroutine = null;
+        }
+        
+        // Restore original color
+        RestoreOriginalColor();
+    }
+    
+    /// <summary>
+    /// Restores the original color of the text.
+    /// </summary>
+    private void RestoreOriginalColor()
+    {
+#if UNITY_TEXTMESHPRO
+        if (waveTextTMP != null)
+        {
+            waveTextTMP.color = originalColor;
+        }
+#else
+        // Try to set color using reflection
+        if (waveTextTMP != null)
+        {
+            var colorProperty = waveTextTMP.GetType().GetProperty("color");
+            if (colorProperty != null)
+            {
+                colorProperty.SetValue(waveTextTMP, originalColor);
+            }
+        }
+#endif
+    }
+    
+    /// <summary>
+    /// Coroutine that creates a smooth blinking animation by fading alpha in and out.
+    /// </summary>
+    private IEnumerator BlinkAnimation()
+    {
+        while (true)
+        {
+            // Fade out
+            float elapsed = 0f;
+            float duration = 1f / blinkSpeed / 2f; // Half cycle duration
+            
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                float alpha = Mathf.Lerp(maxAlpha, minAlpha, t);
+                SetTextAlpha(alpha);
+                yield return null;
+            }
+            
+            // Fade in
+            elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                float alpha = Mathf.Lerp(minAlpha, maxAlpha, t);
+                SetTextAlpha(alpha);
+                yield return null;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Sets the alpha value of the text color.
+    /// </summary>
+    private void SetTextAlpha(float alpha)
+    {
+        Color color = originalColor;
+        color.a = alpha;
+        
+#if UNITY_TEXTMESHPRO
+        if (waveTextTMP != null)
+        {
+            waveTextTMP.color = color;
+        }
+#else
+        // Try to set color using reflection
+        if (waveTextTMP != null)
+        {
+            var colorProperty = waveTextTMP.GetType().GetProperty("color");
+            if (colorProperty != null)
+            {
+                colorProperty.SetValue(waveTextTMP, color);
+            }
+        }
+#endif
     }
 
     /// <summary>
